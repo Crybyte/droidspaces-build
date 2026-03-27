@@ -104,6 +104,9 @@ jobs:
             echo "# CONFIG_ANDROID_PARANOID_NETWORK is not set" >> out/.config
           fi
           
+          # Disable broken OnePlus debug driver
+          echo "# CONFIG_OEM_FORCE_DUMP is not set" >> out/.config
+          
           # Update config
           make O=out ARCH=arm64 olddefconfig
 
