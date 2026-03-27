@@ -1,0 +1,154 @@
+name: Droidspaces Kernel Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      crdroid_branch:
+        description: 'crDroid branch to build'
+        required: true
+        default: '15.0'
+        type: string
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+env:
+  KERNEL_REPO: https://github.com/crdroidandroid/android_kernel_oneplus_sdm845.git
+  DEVICE: enchilada
+  ANDROID_VERSION: "15.0"
+  BUILD_USER: github-actions
+  BUILD_HOST: droidspaces-build
+
+jobs:
+  build-kernel:
+    runs-on: self-hosted
+    timeout-minutes: 240
+    
+    steps:
+      - name: Checkout build scripts
+        uses: actions/checkout@v4
+        with:
+          path: build-scripts
+
+      - name: Setup build environment
+        run: |
+          sudo dnf install -y bc bison flex openssl-devel make gcc gcc-c++
+          mkdir -p ~/kernel-build
+          cd ~/kernel-build
+          
+      - name: Clone kernel source
+        run: |
+          cd ~/kernel-build
+          if [ -d "android_kernel_oneplus_sdm845" ]; then
+            cd android_kernel_oneplus_sdm845
+            git fetch origin
+            git reset --hard origin/${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }}
+          else
+            git clone --depth 1 --branch ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }} \
+              ${{ env.KERNEL_REPO }} android_kernel_oneplus_sdm845
+          fi
+
+      - name: Download Droidspaces patches
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          # Download patches from ravindu644/Droidspaces-OSS
+          curl -L -o droidspaces-patches.zip \
+            https://github.com/ravindu644/Droidspaces-OSS/archive/refs/heads/main.zip
+          unzip -o droidspaces-patches.zip
+
+      - name: Apply Droidspaces patches
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          # Apply non-GKI patches for 4.x kernels
+          for patch in Droidspaces-OSS-main/non-GKI/*; do
+            if [ -f "$patch" ]; then
+              echo "Applying patch: $patch"
+              patch -p1 < "$patch" || echo "Patch failed (may already be applied): $patch"
+            fi
+          done
+
+      - name: Setup kernel configuration
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          # Start with crDroid defconfig
+          make O=out ARCH=arm64 sdm845_defconfig
+          
+          # Apply Droidspaces Kconfig fragment
+          cat Droidspaces-OSS-main/configs/non-GKI.config >> out/.config
+          
+          # Disable ANDROID_PARANOID_NETWORK for container internet
+          scripts/config --file out/.config -d ANDROID_PARANOID_NETWORK
+          
+          # Update config
+          make O=out ARCH=arm64 olddefconfig
+
+      - name: Build kernel
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          
+          make -j$(nproc) O=out ARCH=arm64 \
+            CC=gcc \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            2>&1 | tee build.log
+
+      - name: Upload kernel artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ env.DEVICE }}-${{ github.run_number }}
+          path: |
+            ~/kernel-build/android_kernel_out/arch/arm64/boot/Image.gz-dtb
+            ~/kernel-build/android_kernel_out/arch/arm64/boot/dtbo.img
+            ~/kernel-build/android_kernel_out/build.log
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-log-${{ github.run_number }}
+          path: ~/kernel-build/android_kernel_oneplus_sdm845/build.log
+          retention-days: 7
+
+      - name: Create Release
+        if: github.event.inputs.build_type == 'release' && success()
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: droidspaces-${{ env.DEVICE }}-${{ github.run_number }}
+          name: "Droidspaces Kernel ${{ env.DEVICE }} - Build #${{ github.run_number }}"
+          body: |
+            Automated build of crDroid kernel with Droidspaces support
+            
+            Device: ${{ env.DEVICE }}
+            Branch: ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }}
+            Build Date: ${{ github.event.head_commit.timestamp }}
+            
+            ## Installation
+            1. Flash Image.gz-dtb to boot partition
+            2. Flash dtbo.img to dtbo partition
+            3. Reboot and install Droidspaces app
+            
+            ## Configuration
+            - NAT mode enabled
+            - cgroupfs + vfs drivers
+            - ANDROID_PARANOID_NETWORK disabled
+          files: |
+            ~/kernel-build/android_kernel_out/arch/arm64/boot/Image.gz-dtb
+            ~/kernel-build/android_kernel_out/arch/arm64/boot/dtbo.img
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
