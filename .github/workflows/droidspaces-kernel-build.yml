@@ -122,9 +122,9 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
-          # Build kernel with format warning fix for newer GCC
+          # Build kernel with warning suppressions for newer GCC
           make -j$(nproc) O=out ARCH=arm64 \
-            CC="gcc -Wno-error=format" \
+            CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             Image.gz \
