@@ -114,7 +114,9 @@ jobs:
           make O=out ARCH=arm64 olddefconfig
 
       - name: Build kernel
+        shell: bash
         run: |
+          set -o pipefail
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
           export ARCH=arm64
@@ -124,14 +126,16 @@ jobs:
           
           # Build kernel with warning suppressions for newer GCC
           make -j$(nproc) O=out ARCH=arm64 \
-            CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation" \
+            CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation -Wno-error=enum-int-mismatch" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             Image.gz \
             2>&1 | tee build.log
           
       - name: Build device tree for enchilada
+        shell: bash
         run: |
+          set -o pipefail
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
           export ARCH=arm64
