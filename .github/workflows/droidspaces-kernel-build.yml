@@ -17,10 +17,6 @@ on:
           - release
           - debug
 
-  schedule:
-    # Run weekly on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
-
 env:
   KERNEL_REPO: https://github.com/crdroidandroid/android_kernel_oneplus_sdm845.git
   DEVICE: enchilada
@@ -42,41 +38,43 @@ jobs:
       - name: Setup build environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev make gcc gcc-aarch64-linux-gnu
+          sudo apt-get install -y bc bison flex libssl-dev make gcc gcc-aarch64-linux-gnu unzip
           mkdir -p ~/kernel-build
-          cd ~/kernel-build
-          
+
       - name: Clone kernel source
         run: |
           cd ~/kernel-build
-          if [ -d "android_kernel_oneplus_sdm845" ]; then
-            cd android_kernel_oneplus_sdm845
-            git fetch origin
-            git reset --hard origin/${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }}
-          else
-            git clone --depth 1 --branch ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }} \
-              ${{ env.KERNEL_REPO }} android_kernel_oneplus_sdm845
-          fi
+          git clone --depth 1 --branch ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }} \
+            ${{ env.KERNEL_REPO }} android_kernel_oneplus_sdm845
 
-      - name: Download Droidspaces patches
-        run: |
-          cd ~/kernel-build/android_kernel_oneplus_sdm845
-          # Download patches from ravindu644/Droidspaces-OSS
-          curl -L -o droidspaces-patches.zip \
-            https://github.com/ravindu644/Droidspaces-OSS/archive/refs/heads/main.zip
-          unzip -o droidspaces-patches.zip
-
-      - name: Apply Droidspaces patches
+      - name: Download and apply Droidspaces patches
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
+          # Download Droidspaces patches
+          curl -L -o droidspaces-patches.zip \
+            https://github.com/ravindu644/Droidspaces-OSS/archive/refs/heads/main.zip
+          
+          # Extract and verify
+          unzip -o droidspaces-patches.zip
+          ls -la
+          
+          # Find the extracted directory (might be Droidspaces-OSS-main or similar)
+          DROIDSPACES_DIR=$(find . -maxdepth 1 -type d -name "Droidspaces-OSS*" | head -1)
+          echo "Found Droidspaces directory: $DROIDSPACES_DIR"
+          
           # Apply non-GKI patches for 4.x kernels
-          for patch in Droidspaces-OSS-main/non-GKI/*; do
-            if [ -f "$patch" ]; then
-              echo "Applying patch: $patch"
-              patch -p1 < "$patch" || echo "Patch failed (may already be applied): $patch"
-            fi
-          done
+          if [ -d "$DROIDSPACES_DIR/non-GKI" ]; then
+            for patch in $DROIDSPACES_DIR/non-GKI/*.patch; do
+              if [ -f "$patch" ]; then
+                echo "Applying patch: $patch"
+                patch -p1 < "$patch" || echo "Patch failed (may already be applied): $patch"
+              fi
+            done
+          fi
+          
+          # Store the directory name for next step
+          echo "DROIDSPACES_DIR=$DROIDSPACES_DIR" >> $GITHUB_ENV
 
       - name: Setup kernel configuration
         run: |
@@ -85,11 +83,28 @@ jobs:
           # Start with crDroid defconfig
           make O=out ARCH=arm64 sdm845_defconfig
           
-          # Apply Droidspaces Kconfig fragment
-          cat Droidspaces-OSS-main/configs/non-GKI.config >> out/.config
-          
-          # Disable ANDROID_PARANOID_NETWORK for container internet
-          scripts/config --file out/.config -d ANDROID_PARANOID_NETWORK
+          # Apply Droidspaces Kconfig fragment if available
+          if [ -f "${{ env.DROIDSPACES_DIR }}/configs/non-GKI.config" ]; then
+            echo "Applying Droidspaces config fragment"
+            cat "${{ env.DROIDSPACES_DIR }}/configs/non-GKI.config" >> out/.config
+          else
+            echo "Droidspaces config not found, applying minimal container config manually"
+            # Minimal Droidspaces config for 4.9 kernels
+            cat >> out/.config << 'EOF'
+CONFIG_NAMESPACES=y
+CONFIG_CGROUP_DEVICE=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_MEMCG=y
+CONFIG_SECCOMP=y
+CONFIG_VETH=y
+CONFIG_BRIDGE=y
+CONFIG_BRIDGE_NETFILTER=y
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_OVERLAY_FS=y
+CONFIG_DEVTMPFS=y
+# CONFIG_ANDROID_PARANOID_NETWORK is not set
+EOF
+          fi
           
           # Update config
           make O=out ARCH=arm64 olddefconfig
@@ -113,9 +128,9 @@ jobs:
         with:
           name: kernel-${{ env.DEVICE }}-${{ github.run_number }}
           path: |
-            ~/kernel-build/android_kernel_out/arch/arm64/boot/Image.gz-dtb
-            ~/kernel-build/android_kernel_out/arch/arm64/boot/dtbo.img
-            ~/kernel-build/android_kernel_out/build.log
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dtbo.img
+            ~/kernel-build/android_kernel_oneplus_sdm845/build.log
           retention-days: 30
 
       - name: Upload build log on failure
@@ -149,7 +164,7 @@ jobs:
             - cgroupfs + vfs drivers
             - ANDROID_PARANOID_NETWORK disabled
           files: |
-            ~/kernel-build/android_kernel_out/arch/arm64/boot/Image.gz-dtb
-            ~/kernel-build/android_kernel_out/arch/arm64/boot/dtbo.img
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dtbo.img
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
