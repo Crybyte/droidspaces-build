@@ -104,8 +104,9 @@ jobs:
             echo "# CONFIG_ANDROID_PARANOID_NETWORK is not set" >> out/.config
           fi
           
-          # Disable broken OnePlus debug driver
+          # Disable broken OnePlus drivers
           echo "# CONFIG_OEM_FORCE_DUMP is not set" >> out/.config
+          echo "# CONFIG_QCOM_SMB_LIB is not set" >> out/.config
           
           # Update config
           make O=out ARCH=arm64 olddefconfig
@@ -137,7 +138,7 @@ jobs:
           make -j$(nproc) O=out ARCH=arm64 \
             CC=gcc \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            enchilada-pvt.dtb \
+            qcom/enchilada-pvt.dtb \
             2>&1 | tee -a build.log || echo "DTB build had warnings but continuing"
 
       - name: Upload kernel artifacts
@@ -147,7 +148,7 @@ jobs:
           name: kernel-${{ env.DEVICE }}-${{ github.run_number }}
           path: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/enchilada-pvt.dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/enchilada-pvt.dtb
             ~/kernel-build/android_kernel_oneplus_sdm845/build.log
           retention-days: 30
 
@@ -183,6 +184,6 @@ jobs:
             - ANDROID_PARANOID_NETWORK disabled
           files: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/enchilada-pvt.dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/enchilada-pvt.dtb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
