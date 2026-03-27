@@ -38,7 +38,7 @@ jobs:
       - name: Setup build environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev make gcc gcc-aarch64-linux-gnu unzip
+          sudo apt-get install -y bc bison flex libssl-dev make gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi unzip
           mkdir -p ~/kernel-build
 
       - name: Clone kernel source
@@ -118,11 +118,13 @@ jobs:
           export ARCH=arm64
           export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
           # Build kernel image only first (skip DTB for now)
           make -j$(nproc) O=out ARCH=arm64 \
             CC=gcc \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             Image.gz \
             2>&1 | tee build.log
           
@@ -133,11 +135,13 @@ jobs:
           export ARCH=arm64
           export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
           # Only build enchilada PVT device tree (most common variant)
           make -j$(nproc) O=out ARCH=arm64 \
             CC=gcc \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             qcom/enchilada-pvt.dtb \
             2>&1 | tee -a build.log || echo "DTB build had warnings but continuing"
 
