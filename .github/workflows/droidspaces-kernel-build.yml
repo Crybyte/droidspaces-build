@@ -80,8 +80,8 @@ jobs:
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
-          # Start with crDroid defconfig
-          make O=out ARCH=arm64 sdm845_defconfig
+          # Start with enchilada defconfig (OnePlus 6 specific, not generic sdm845)
+          make O=out ARCH=arm64 enchilada_defconfig
           
           # Apply Droidspaces Kconfig fragment if available
           if [ -f "${{ env.DROIDSPACES_DIR }}/configs/non-GKI.config" ]; then
@@ -104,9 +104,9 @@ jobs:
             echo "# CONFIG_ANDROID_PARANOID_NETWORK is not set" >> out/.config
           fi
           
-          # Disable broken OnePlus drivers
+          # Disable broken OnePlus debug driver only
+          # Note: CONFIG_QCOM_SMB_LIB (power supply) is needed for charging
           echo "# CONFIG_OEM_FORCE_DUMP is not set" >> out/.config
-          echo "# CONFIG_QCOM_SMB_LIB is not set" >> out/.config
           
           # Update config
           make O=out ARCH=arm64 olddefconfig
