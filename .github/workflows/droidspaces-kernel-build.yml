@@ -157,6 +157,7 @@ jobs:
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dtb
             ~/kernel-build/android_kernel_oneplus_sdm845/build.log
           retention-days: 30
+          if-no-files-found: error
 
       - name: Upload build log on failure
         if: failure()
