@@ -28,6 +28,8 @@ jobs:
   build-kernel:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 240
+    permissions:
+      contents: write  # Required to create releases
     
     steps:
       - name: Checkout build scripts
