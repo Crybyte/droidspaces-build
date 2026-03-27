@@ -122,9 +122,9 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
-          # Build kernel image only first (skip DTB for now)
+          # Build kernel with format warning fix for newer GCC
           make -j$(nproc) O=out ARCH=arm64 \
-            CC=gcc \
+            CC="gcc -Wno-error=format" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             Image.gz \
@@ -139,13 +139,13 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
-          # Only build enchilada PVT device tree (most common variant)
+          # Build dtbs target which includes all enchilada variants
           make -j$(nproc) O=out ARCH=arm64 \
             CC=gcc \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            qcom/enchilada-pvt.dtb \
-            2>&1 | tee -a build.log || echo "DTB build had warnings but continuing"
+            dtbs \
+            2>&1 | tee -a build.log
 
       - name: Upload kernel artifacts
         if: success()
@@ -154,7 +154,7 @@ jobs:
           name: kernel-${{ env.DEVICE }}-${{ github.run_number }}
           path: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/enchilada-pvt.dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dtb
             ~/kernel-build/android_kernel_oneplus_sdm845/build.log
           retention-days: 30
 
@@ -190,6 +190,6 @@ jobs:
             - ANDROID_PARANOID_NETWORK disabled
           files: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/enchilada-pvt.dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dtb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
