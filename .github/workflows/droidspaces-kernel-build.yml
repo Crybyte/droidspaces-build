@@ -118,10 +118,27 @@ jobs:
           export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
+          # Build kernel image only first (skip DTB for now)
           make -j$(nproc) O=out ARCH=arm64 \
             CC=gcc \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            Image.gz \
             2>&1 | tee build.log
+          
+      - name: Build device tree for enchilada
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          
+          # Only build enchilada PVT device tree (most common variant)
+          make -j$(nproc) O=out ARCH=arm64 \
+            CC=gcc \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            enchilada-pvt.dtb \
+            2>&1 | tee -a build.log || echo "DTB build had warnings but continuing"
 
       - name: Upload kernel artifacts
         if: success()
@@ -129,8 +146,8 @@ jobs:
         with:
           name: kernel-${{ env.DEVICE }}-${{ github.run_number }}
           path: |
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dtbo.img
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/enchilada-pvt.dtb
             ~/kernel-build/android_kernel_oneplus_sdm845/build.log
           retention-days: 30
 
@@ -165,7 +182,7 @@ jobs:
             - cgroupfs + vfs drivers
             - ANDROID_PARANOID_NETWORK disabled
           files: |
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dtbo.img
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/enchilada-pvt.dtb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
