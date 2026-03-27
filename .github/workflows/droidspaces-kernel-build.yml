@@ -41,7 +41,8 @@ jobs:
 
       - name: Setup build environment
         run: |
-          sudo dnf install -y bc bison flex openssl-devel make gcc gcc-c++
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev make gcc gcc-aarch64-linux-gnu
           mkdir -p ~/kernel-build
           cd ~/kernel-build
           
