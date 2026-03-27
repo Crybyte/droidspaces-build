@@ -10,7 +10,7 @@ This repository contains GitHub Actions workflows for building Android kernels w
 
 - **Automated weekly builds** via GitHub Actions
 - **Manual trigger support** for on-demand builds
-- **Self-hosted runner** on Oracle Cloud ARM64 for native ARM compilation
+- **GitHub-hosted ARM64 runners** (pay-as-you-go, ~$1-2 per build)
 - **Droidspaces patches** automatically applied from [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS)
 
 ## Supported Devices
@@ -54,18 +54,17 @@ CONFIG_DEVTMPFS=y
   - `crdroid_branch`: Target crDroid branch (default: `15.0`)
   - `build_type`: `release` (creates GitHub release) or `debug`
 
-## Self-Hosted Runner Setup
+## Build Costs
 
-This workflow runs on an Oracle Cloud ARM64 instance. To register the runner:
+This workflow uses GitHub-hosted ARM64 runners:
+- **Price:** ~$0.016/minute (~$1/hour of build time)
+- **Typical kernel build:** 1-2 hours = ~$1-2 per build
+- **Weekly automated builds:** ~$4-8/month if running every Sunday
 
-```bash
-# On your Oracle Cloud ARM64 server
-cd ~/actions-runner
-./config.sh --url https://github.com/Crybyte/droidspaces-build --token TOKEN
-./run.sh
-```
-
-Get the token from: Settings → Actions → Runners → New self-hosted runner
+To minimize costs:
+- Disable scheduled builds if not actively developing
+- Use manual triggers for one-off builds
+- Builds only run when you explicitly trigger them
 
 ## Installation
 

@@ -30,7 +30,7 @@ env:
 
 jobs:
   build-kernel:
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 240
     
     steps:
