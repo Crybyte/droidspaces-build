@@ -92,7 +92,7 @@ jobs:
           cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || { echo "ERROR: KernelSU Makefile missing!"; exit 1; }
           
           # FIX: Patch KernelSU for kernel 4.9 compatibility
-          # path_umount() and check_mnt() don't exist in kernel 4.9 (introduced in 5.x)
+          # path_umount() doesn't exist in kernel 4.9 (introduced in 5.x)
           echo "=== Patching KernelSU for kernel 4.9 compatibility ==="
           
           # CRITICAL FIX: The setup.sh creates KernelSU-Next and symlinks drivers/kernelsu -> KernelSU-Next/kernel
@@ -133,12 +133,100 @@ jobs:
             exit 1
           fi
           
-          # Download and run the kernel 4.9 compatibility fix script
-          echo "=== Running KernelSU kernel 4.9 compatibility fixer ==="
-          curl -L -o /tmp/fix_kernelsu_49.py "https://raw.githubusercontent.com/Crybyte/droidspaces-build/main/build-scripts/fix_kernelsu_49.py"
-          python3 /tmp/fix_kernelsu_49.py "$KSU_KERNEL_DIR"
+          # Find all .c and .h files in the kernel directory and patch them
+          PATCH_COUNT=0
+          for file in "$KSU_KERNEL_DIR"/*.c "$KSU_KERNEL_DIR"/*.h; do
+            if [ -f "$file" ]; then
+              FILE_NAME=$(basename "$file")
+              
+              # Create a backup
+              cp "$file" "${file}.bak"
+              
+              # Count occurrences of path_umount
+              PATH_UMOUNT_COUNT=$(grep -c "path_umount" "$file" 2>/dev/null || echo "0")
+              
+              if [ "$PATH_UMOUNT_COUNT" -gt 0 ]; then
+                echo "Found $PATH_UMOUNT_COUNT occurrences of path_umount in $FILE_NAME"
+                echo "Applying path_umount kernel 4.9 compatibility patch..."
+                
+                # AGGRESSIVE path_umount patching for kernel 4.9
+                # path_umount was introduced in kernel 5.9, doesn't exist in 4.9
+                # We need to replace path_umount(path, flags) with umount(path)
+                
+                # Strategy 1: Perl regex to handle path_umount(anything, flags)
+                perl -i -pe 's/path_umount\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/umount($1)/g' "$file"
+                
+                # Strategy 2: Alternative pattern with different spacing
+                perl -i -pe 's/path_umount\s*\(\s*([^,\s]+)\s*,[^)]+\)/umount($1)/g' "$file"
+                
+                # Strategy 3: Line-by-line replacement using sed for remaining cases
+                # This handles edge cases perl might miss
+                sed -i 's/path_umount[[:space:]]*(/umount(/g' "$file"
+                
+                # Remove the second argument (flags) - common patterns
+                sed -i 's/,[[:space:]]*MNT_DETACH[[:space:]]*)/)/g' "$file"
+                sed -i 's/,[[:space:]]*0[[:space:]]*)/)/g' "$file"
+                sed -i 's/,[[:space:]]*UMOUNT_NOFOLLOW[[:space:]]*)/)/g' "$file"
+                
+                # Verify the patch was applied
+                REMAINING=$(grep -c "path_umount" "$file" 2>/dev/null || echo "0")
+                if [ "$REMAINING" -gt 0 ]; then
+                  echo "WARNING: $REMAINING path_umount calls still found in $FILE_NAME after patching!"
+                  grep -n "path_umount" "$file" | head -10
+                  echo "ERROR: Failed to patch all path_umount calls"
+                  exit 1
+                else
+                  echo "SUCCESS: All path_umount calls replaced in $FILE_NAME"
+                  PATCH_COUNT=$((PATCH_COUNT + PATH_UMOUNT_COUNT))
+                fi
+              fi
+              
+              # FIX: KERNEL_VERSION macro requires 3 arguments in kernel 4.9
+              # Replace KERNEL_VERSION(a, b) with KERNEL_VERSION(a, b, 0)
+              KERNEL_VER_COUNT=$(grep -c 'KERNEL_VERSION[[:space:]]*(' "$file" 2>/dev/null || echo "0")
+              if [ "$KERNEL_VER_COUNT" -gt 0 ]; then
+                echo "Found KERNEL_VERSION usage in $FILE_NAME - checking for 2-arg calls..."
+                # Count 2-argument calls (pattern: KERNEL_VERSION(num, num))
+                TWO_ARG_COUNT=$(grep -oE 'KERNEL_VERSION[[:space:]]*\([[:space:]]*[0-9]+[[:space:]]*,[[:space:]]*[0-9]+[[:space:]]*\)' "$file" 2>/dev/null | wc -l || echo "0")
+                if [ "$TWO_ARG_COUNT" -gt 0 ]; then
+                  echo "Found $TWO_ARG_COUNT 2-argument KERNEL_VERSION calls - patching..."
+                  # Replace KERNEL_VERSION(x, y) with KERNEL_VERSION(x, y, 0)
+                  perl -i -pe 's/KERNEL_VERSION\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*\)/KERNEL_VERSION($1, $2, 0)/g' "$file"
+                  echo "Patched KERNEL_VERSION calls in $FILE_NAME"
+                fi
+              fi
+              
+              # FIX: try_umount function signature in kernel 4.9
+              # try_umount(path, flags) became try_umount(path) in older kernels
+              TRY_UMOUNT_COUNT=$(grep -c 'try_umount' "$file" 2>/dev/null || echo "0")
+              if [ "$TRY_UMOUNT_COUNT" -gt 0 ]; then
+                echo "Found try_umount usage in $FILE_NAME - checking arguments..."
+                # Check if try_umount is being called with 2 arguments
+                TWO_ARG_TRY=$(grep -oE 'try_umount[[:space:]]*\([^,]+,[^)]+\)' "$file" 2>/dev/null | wc -l || echo "0")
+                if [ "$TWO_ARG_TRY" -gt 0 ]; then
+                  echo "Found 2-argument try_umount calls - patching to 1 argument..."
+                  # Replace try_umount(path, flags) with try_umount(path)
+                  perl -i -pe 's/try_umount\s*\(\s*([^,]+)\s*,[^)]+\)/try_umount($1)/g' "$file"
+                  echo "Patched try_umount calls in $FILE_NAME"
+                fi
+              fi
+              
+          # Run external fix script for kernel 4.9 compatibility
+          if [ -f "build-scripts/fix-kernelsu-49-v2.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v2 ==="
+            chmod +x build-scripts/fix-kernelsu-49-v2.sh
+            build-scripts/fix-kernelsu-49-v2.sh "$KSU_KERNEL_DIR"
+          elif [ -f "build-scripts/fix-kernelsu-49.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script ==="
+            chmod +x build-scripts/fix-kernelsu-49.sh
+            build-scripts/fix-kernelsu-49.sh "$KSU_KERNEL_DIR"
+          else
+            echo "WARNING: fix-kernelsu-49.sh not found, applying inline patches only"
+          fi
+            fi
+          done
           
-          echo "=== Patching complete ==="
+          echo "=== Patching complete: $PATCH_COUNT path_umount calls replaced ==="
           
           # Verify the symlink is correct
           echo "=== Final verification ==="
