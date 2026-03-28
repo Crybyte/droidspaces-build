@@ -580,7 +580,7 @@ static int ksu_umount_mnt(struct path *path)
 	
 	pathname = dentry_path_raw(dentry, buf, PATH_MAX);
 	if (!IS_ERR(pathname)) {
-		err = umount(pathname);
+		err = sys_umount(pathname, 0);
 	}
 	kfree(buf);
 	return err;
