@@ -405,11 +405,11 @@ jobs:
           
           # Build with warnings suppressed (crDroid++ uses these flags)
           # Suppress common warnings that become errors on newer GCC
-          make -j$(nproc) O=out ARCH=arm64 \\
-            CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation -Wno-error=enum-int-mismatch -Wno-error=memset-elt-size -Wno-error=stringop-overread -Wno-error=duplicate-decl-specifier -Wno-error=array-parameter= -Wno-error=maybe-uninitialized -Wno-error=parentheses -Wno-error=int-in-bool-context" \\
-            CROSS_COMPILE=aarch64-linux-gnu- \\
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \\
-            Image.gz-dtb 2>&1 | tee build.log
+          # Single-line make command to avoid YAML escaping issues
+          MAKE_ARGS="-j$(nproc) O=out ARCH=arm64"
+          CC_ARGS="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation -Wno-error=enum-int-mismatch -Wno-error=memset-elt-size -Wno-error=stringop-overread -Wno-error=duplicate-decl-specifier -Wno-error=array-parameter= -Wno-error=maybe-uninitialized -Wno-error=parentheses -Wno-error=int-in-bool-context"
+          
+          make $MAKE_ARGS CC="$CC_ARGS" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb 2>&1 | tee build.log
           
           echo "=== Build complete ==="
           ls -la out/arch/arm64/boot/Image.gz-dtb || echo "Kernel image not found!"
