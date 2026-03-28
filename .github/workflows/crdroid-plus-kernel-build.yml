@@ -210,6 +210,47 @@ jobs:
                   echo "Patched try_umount calls in $FILE_NAME"
                 fi
               fi
+              
+              # CRITICAL FIX: try_umount function definition for kernel 4.9
+              # The function body uses check_mnt and flags parameters which don't exist in kernel 4.9
+              # We need to patch the function definition and body
+              if [ "$FILE_NAME" = "core_hook.c" ]; then
+                echo "Checking try_umount function definition in core_hook.c..."
+                # Check if the function definition has 3 parameters (kernel 5.x style)
+                if grep -q 'static int try_umount(struct path \*path, bool check_mnt' "$file" 2>/dev/null; then
+                  echo "Found 3-param try_umount definition - patching for kernel 4.9..."
+                  
+                  # Replace function signature: remove check_mnt and flags parameters
+                  perl -i -pe 's/static int try_umount\s*\(\s*struct path \*path\s*,\s*bool check_mnt\s*,\s*unsigned int flags\s*\)/static int try_umount(struct path *path)/g' "$file"
+                  
+                  # Replace code that uses check_mnt variable
+                  # Change: if (check_mnt && !should_umount(&path)) { ... }
+                  # To: if (!should_umount(&path)) { ... }
+                  perl -i -pe 's/if\s*\(\s*check_mnt\s*&&\s*/if (/g' "$file"
+                  
+                  # Replace ksu_umount_mnt(&path, flags) with umount(path)
+                  perl -i -pe 's/ksu_umount_mnt\s*\(\s*&path\s*,\s*flags\s*\)/umount(path)/g' "$file"
+                  
+                  # Also try simpler pattern for ksu_umount_mnt
+                  sed -i 's/ksu_umount_mnt[[:space:]]*(&path,[[:space:]]*flags)/umount(path)/g' "$file"
+                  
+                  echo "Patched try_umount function definition in core_hook.c"
+                fi
+                
+                # Additional check: look for any remaining references to check_mnt or flags in try_umount
+                CHECK_MNT_REMAINING=$(grep -c 'check_mnt' "$file" 2>/dev/null || echo "0")
+                FLAGS_IN_TRY=$(grep -A 20 'try_umount' "$file" 2>/dev/null | grep -c '\bflags\b' || echo "0")
+                if [ "$CHECK_MNT_REMAINING" -gt 0 ] || [ "$FLAGS_IN_TRY" -gt 0 ]; then
+                  echo "WARNING: Found remaining check_mnt ($CHECK_MNT_REMAINING) or flags ($FLAGS_IN_TRY) references"
+                  echo "Applying aggressive cleanup..."
+                  
+                  # Comment out or remove lines with check_mnt
+                  sed -i 's/.*check_mnt.*//g' "$file"
+                  
+                  # In try_umount function, replace flags with 0 in function calls
+                  sed -i '/try_umount/,/^}/ s/flags/0/g' "$file"
+                fi
+              fi
             fi
           done
           
