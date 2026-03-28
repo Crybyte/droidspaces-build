@@ -212,7 +212,11 @@ jobs:
               fi
               
           # Run external fix script for kernel 4.9 compatibility
-          if [ -f "build-scripts/fix-kernelsu-49.sh" ]; then
+          if [ -f "build-scripts/fix-kernelsu-49-v2.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v2 ==="
+            chmod +x build-scripts/fix-kernelsu-49-v2.sh
+            build-scripts/fix-kernelsu-49-v2.sh "$KSU_KERNEL_DIR"
+          elif [ -f "build-scripts/fix-kernelsu-49.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script ==="
             chmod +x build-scripts/fix-kernelsu-49.sh
             build-scripts/fix-kernelsu-49.sh "$KSU_KERNEL_DIR"
