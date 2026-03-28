@@ -394,6 +394,10 @@ jobs:
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
+          echo "=== Cleaning source directory ==="
+          # Clean the source directory to fix ".. is not clean" error
+          make mrproper 2>/dev/null || true
+          
           echo "=== Building crDroid++ kernel ==="
           echo "CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32"
           
