@@ -211,32 +211,14 @@ jobs:
                 fi
               fi
               
-              # CRITICAL FIX: try_umount function definition for kernel 4.9
-              # The function body uses check_mnt and flags parameters which don't exist in kernel 4.9
-              # We need to replace the entire function with a kernel 4.9 compatible version
-              if [ "$FILE_NAME" = "core_hook.c" ]; then
-                echo "Checking try_umount function definition in core_hook.c..."
-                # Check if the function definition has 3 parameters (kernel 5.x style)
-                if grep -q 'static int try_umount(struct path \*path, bool check_mnt' "$file" 2>/dev/null; then
-                  echo "Found 3-param try_umount definition - patching for kernel 4.9..."
-                  
-                  # Create Python script for robust function replacement (base64 encoded to avoid YAML issues)
-                  echo "Creating Python fix script..."
-                  echo "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwppbXBvcnQgcmUKaW1wb3J0IHN5cwoKZGVmIGZpeF90cnlfdW1vdW50KGZpbGVwYXRoKToKICAgIHdpdGggb3BlbihmaWxlcGF0aCwgJ3InKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgCiAgICBsaW5lcyA9IGNvbnRlbnQuc3BsaXQoJwonKQogICAgZnVuY19zdGFydCA9IC0xCiAgICBmdW5jX2VuZCA9IC0xCiAgICBicmFjZV9jb3VudCA9IDAKICAgIGluX2Z1bmN0aW9uID0gRmFsc2UKICAgIAogICAgZm9yIGksIGxpbmUgaW4gZW51bWVyYXRlKGxpbmVzKToKICAgICAgICBpZiBub3QgaW5fZnVuY3Rpb246CiAgICAgICAgICAgIGlmIHJlLnNlYXJjaChyJ3N0YXRpY1xzK2ludFxzK3RyeV91bW91bnRccypcKFxzKnN0cnVjdFxzK3BhdGhccypcKlxzKnBhdGhccyosXHMqYm9vbFxzK2NoZWNrX21udCcsIGxpbmUpOgogICAgICAgICAgICAgICAgZnVuY19zdGFydCA9IGkKICAgICAgICAgICAgICAgIGluX2Z1bmN0aW9uID0gVHJ1ZQogICAgICAgICAgICAgICAgYnJhY2VfY291bnQgPSBsaW5lLmNvdW50KCd7JykgLSBsaW5lLmNvdW50KCd9JykKICAgICAgICBlbHNlOgogICAgICAgICAgICBicmFjZV9jb3VudCArPSBsaW5lLmNvdW50KCd7JykgLSBsaW5lLmNvdW50KCd9JykKICAgICAgICAgICAgaWYgYnJhY2VfY291bnQgPT0gMCBhbmQgJ3snIGluICcnLmpvaW4obGluZXNbZnVuY19zdGFydDppKzFdKToKICAgICAgICAgICAgICAgIGZ1bmNfZW5kID0gaQogICAgICAgICAgICAgICAgYnJlYWsKICAgIAogICAgaWYgZnVuY19zdGFydCA+PSAwIGFuZCBmdW5jX2VuZCA+IGZ1bmNfc3RhcnQ6CiAgICAgICAgcHJpbnQoZiJGb3VuZCB0cnlfdW1vdW50IGZ1bmN0aW9uIGZyb20gbGluZSB7ZnVuY19zdGFydCsxfSB0byB7ZnVuY19lbmQrMX0iKQogICAgICAgIAogICAgICAgIHJlcGxhY2VtZW50ID0gIiIic3RhdGljIGludCB0cnlfdW1vdW50KHN0cnVjdCBwYXRoICpwYXRoKQp7CglpbnQgZXJyID0gMDsKCXN0cnVjdCBtb3VudCAqbW50ID0gcmVhbF9tb3VudChwYXRoLT5tbnQpOwoKCWlmICghc2hvdWxkX3Vtb3VudChtbnQpKSB7CgkJcmV0dXJuIC1FQlVTWTsKCX0KCgllcnIgPSB1bW91bnQocGF0aCk7CglyZXR1cm4gZXJyOwp9IiIiCiAgICAgICAgCiAgICAgICAgbmV3X2xpbmVzID0gbGluZXNbOmZ1bmNfc3RhcnRdICsgcmVwbGFjZW1lbnQuc3BsaXQoJwonKSArIGxpbmVzW2Z1bmNfZW5kKzE6XQogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgJ3cnKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKCcKJy5qb2luKG5ld19saW5lcykpCiAgICAgICAgcHJpbnQoIlN1Y2Nlc3NmdWxseSByZXBsYWNlZCB0cnlfdW1vdW50IGZ1bmN0aW9uIHdpdGgga2VybmVsIDQuOSBjb21wYXRpYmxlIHZlcnNpb24iKQogICAgICAgIHJldHVybiBUcnVlCiAgICBlbHNlOgogICAgICAgIHByaW50KCJDb3VsZCBub3QgZmluZCB0cnlfdW1vdW50IGZ1bmN0aW9uIHdpdGggMyBwYXJhbWV0ZXJzIikKICAgICAgICByZXR1cm4gRmFsc2UKCmlmIF9fbmFtZV9fID09ICdfX21haW5fXyc6CiAgICBpZiBsZW4oc3lzLmFyZ3YpICE9IDI6CiAgICAgICAgcHJpbnQoZiJVc2FnZToge3N5cy5hcmd2WzBdfSA8cGF0aF90b19jb3JlX2hvb2suYz4iKQogICAgICAgIHN5cy5leGl0KDEpCiAgICAKICAgIGZpbGVwYXRoID0gc3lzLmFyZ3ZbMV0KICAgIGlmIGZpeF90cnlfdW1vdW50KGZpbGVwYXRoKToKICAgICAgICBzeXMuZXhpdCgwKQogICAgZWxzZToKICAgICAgICBzeXMuZXhpdCgxKQo=" | base64 -d > /tmp/fix_try_umount.py
-                  chmod +x /tmp/fix_try_umount.py
-                  
-                  # Run the Python fix script
-                  python3 /tmp/fix_try_umount.py "$file"
-                  if [ $? -eq 0 ]; then
-                    echo "Successfully patched try_umount function definition in core_hook.c"
-                  else
-                    echo "ERROR: Failed to patch try_umount function"
-                    exit 1
-                  fi
-                else
-                  echo "No 3-param try_umount definition found - may already be patched"
-                fi
-              fi
+          # Run external fix script for kernel 4.9 compatibility
+          if [ -f "build-scripts/fix-kernelsu-49.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script ==="
+            chmod +x build-scripts/fix-kernelsu-49.sh
+            build-scripts/fix-kernelsu-49.sh "$KSU_KERNEL_DIR"
+          else
+            echo "WARNING: fix-kernelsu-49.sh not found, applying inline patches only"
+          fi
             fi
           done
           
