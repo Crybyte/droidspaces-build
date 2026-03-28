@@ -350,6 +350,16 @@ jobs:
             echo "SUCCESS: Applied function declaration fix v33"
           fi
 
+          # CRITICAL FIX v34: Fix undefined reference to umount
+          # The ksu_umount_mnt function calls umount() which doesn't exist in kernel 4.9
+          # We need to replace it with ksys_umount for kernel 4.9 compatibility
+          echo "=== CRITICAL FIX v34: Fixing undefined reference to umount ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v34.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v34 (Python)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v34.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
           # CRITICAL: Apply pre-patched file LAST as final override (fallback)
           # This ensures any corruptions from fix scripts are corrected
           if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
