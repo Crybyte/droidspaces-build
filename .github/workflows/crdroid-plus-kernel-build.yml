@@ -90,6 +90,24 @@ jobs:
           ls -la KernelSU/ 2>/dev/null || { echo "ERROR: KernelSU directory missing!"; exit 1; }
           echo "=== KernelSU Makefile check ==="
           cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || { echo "ERROR: KernelSU Makefile missing!"; exit 1; }
+          
+          # FIX: Patch KernelSU for kernel 4.9 compatibility
+          # path_umount() doesn't exist in kernel 4.9, use kern_path() + umount() instead
+          echo "=== Patching KernelSU for kernel 4.9 compatibility ==="
+          if [ -f "KernelSU/kernel/core_hook.c" ]; then
+            # Check if path_umount is used (only exists in kernel 5.x+)
+            if grep -q "path_umount" KernelSU/kernel/core_hook.c; then
+              echo "Found path_umount usage - applying kernel 4.9 compatibility patch"
+              # Replace path_umount with alternative implementation for 4.9
+              sed -i 's/path_umount(path, 0);/\/\/ path_umount not available in 4.9 - using alternative\n\t{\n\t\tstruct path p;\n\t\tif (!kern_path(mnt_point, 0, \&p)) {\n\t\t\tumount(mnt_point);\n\t\t}\n\t}/g' KernelSU/kernel/core_hook.c || true
+              # Also try simpler replacement
+              sed -i 's/path_umount(path, 0);/umount(mnt_point);/g' KernelSU/kernel/core_hook.c || true
+              echo "Patched path_umount calls"
+            fi
+            
+            # Additional fix: some versions use different parameter order
+            sed -i 's/path_umount(path,/umount(mnt_point); \/\/ path_umount(/g' KernelSU/kernel/core_hook.c || true
+          fi
 
       - name: Add susfs patches (v1.5.5 for kernel 4.9)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
