@@ -780,8 +780,7 @@ static int ksu_inode_rename(struct inode *old_inode, struct dentry *old_dentry,
 	return ksu_handle_rename(old_dentry, new_dentry);
 }
 
-static int ksu_task_fix_setuid(struct cred *new, const struct cred *old,
-			       int flags)
+static int ksu_task_fix_setuid(struct cred *new, const struct cred *old)
 {
 	return ksu_handle_setuid(new, old);
 }
