@@ -215,7 +215,11 @@ jobs:
           
           # Run external fix script for kernel 4.9 compatibility
           # This handles the try_umount function DEFINITION (not just calls)
-          if [ -f "build-scripts/fix_kernelsu_49.py" ]; then
+          if [ -f "build-scripts/fix-kernelsu-49-v3.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v3 ==="
+            chmod +x build-scripts/fix-kernelsu-49-v3.sh
+            build-scripts/fix-kernelsu-49-v3.sh "$KSU_KERNEL_DIR"
+          elif [ -f "build-scripts/fix_kernelsu_49.py" ]; then
             echo "=== Running kernel 4.9 compatibility Python fixer ==="
             python3 build-scripts/fix_kernelsu_49.py "$KSU_KERNEL_DIR"
           elif [ -f "build-scripts/fix-kernelsu-49-v2.sh" ]; then
