@@ -231,12 +231,12 @@ jobs:
           
           # Run external fix script for kernel 4.9 compatibility
           # This handles the try_umount function DEFINITION (not just calls)
-          if [ -f "build-scripts/core_hook.c.patched" ]; then
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
             echo "=== Applying pre-patched core_hook.c for kernel 4.9 compatibility ==="
             KSU_CORE_HOOK="$KSU_KERNEL_DIR/core_hook.c"
             if [ -f "$KSU_CORE_HOOK" ]; then
               cp "$KSU_CORE_HOOK" "${KSU_CORE_HOOK}.orig"
-              cp build-scripts/core_hook.c.patched "$KSU_CORE_HOOK"
+              cp "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" "$KSU_CORE_HOOK"
               echo "SUCCESS: Replaced core_hook.c with kernel 4.9 compatible version"
               # Verify the patch
               if grep -q "kmalloc(PATH_MAX" "$KSU_CORE_HOOK"; then
@@ -251,77 +251,77 @@ jobs:
           
           # CRITICAL FIX v24: Fixed 'flags' undeclared error for KernelSU-Next v1.0.7
           # Fixes line 591: ksu_umount_mnt(&path, flags) -> ksu_umount_mnt(&path, 0)
-          if [ -f "build-scripts/fix_kernelsu_49_v24.py" ]; then
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v24.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v24 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v24.py "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v24.py" "$KSU_KERNEL_DIR"
           # CRITICAL FIX v23: Fixed 'flags' undeclared error in ksu_umount_mnt calls
-          elif [ -f "build-scripts/fix_kernelsu_49_v23.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v23.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v23 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v23.py "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v23.py" "$KSU_KERNEL_DIR"
           # CRITICAL FIX v22: Fixed ksu_umount_mnt(&path, flags) handling
-          elif [ -f "build-scripts/fix_kernelsu_49_v22.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v22.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v22 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v22.py "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v22.py" "$KSU_KERNEL_DIR"
           # CRITICAL FIX v21: Fixed ksu_umount_mnt call handling (v18 had broken regex)
-          elif [ -f "build-scripts/fix_kernelsu_49_v21.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v21.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v21 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v21.py "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v21.py" "$KSU_KERNEL_DIR"
           # CRITICAL FIX v18: Ultra-aggressive fix for all flags-related issues
           # This handles ALL function signatures with flags parameters - FIXED function signature removal
-          elif [ -f "build-scripts/fix_kernelsu_49_v18.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v18.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v18 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v18.py "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v18.py" "$KSU_KERNEL_DIR"
           # CRITICAL FIX v17: Ultra-aggressive fix for all flags-related issues
-          elif [ -f "build-scripts/fix_kernelsu_49_v17.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v17.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v17 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v17.py "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v17.py" "$KSU_KERNEL_DIR"
           # CRITICAL FIX v16: Run comprehensive Python fixer to catch any remaining issues
           # This handles flags parameters, check_mnt, multi-line function definitions
-          elif [ -f "build-scripts/fix_kernelsu_49_v16.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v16.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v16 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v16.py "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix_kernelsu_49_v15.py" ]; then
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v16.py" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v15.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v15 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v15.py "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v12.sh" ]; then
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v15.py" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v12.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v12 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v12.sh
-            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v12.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v11.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v12.sh"
+            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v12.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v11.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v11 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v11.sh
-            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v11.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v10.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v11.sh"
+            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v11.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v10.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v10 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v10.sh
-            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v10.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v9.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v10.sh"
+            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v10.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v9.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v9 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v9.sh
-            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v9.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v8.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v9.sh"
+            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v9.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v8.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v8 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v8.sh
-            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v8.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v4.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v8.sh"
+            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v8.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v4.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v4 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v4.sh
-            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v4.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v3.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v4.sh"
+            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v4.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v3.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v3 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v3.sh
-            build-scripts/fix-kernelsu-49-v3.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix_kernelsu_49.py" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v3.sh"
+            "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v3.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49.py" ]; then
             echo "=== Running kernel 4.9 compatibility Python fixer ==="
-            python3 build-scripts/fix_kernelsu_49.py "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49-v2.sh" ]; then
+            python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49.py" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v2.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v2 ==="
-            chmod +x build-scripts/fix-kernelsu-49-v2.sh
-            build-scripts/fix-kernelsu-49-v2.sh "$KSU_KERNEL_DIR"
-          elif [ -f "build-scripts/fix-kernelsu-49.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v2.sh"
+            "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v2.sh" "$KSU_KERNEL_DIR"
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script ==="
-            chmod +x build-scripts/fix-kernelsu-49.sh
-            build-scripts/fix-kernelsu-49.sh "$KSU_KERNEL_DIR"
+            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49.sh"
+            "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49.sh" "$KSU_KERNEL_DIR"
           else
             echo "WARNING: No kernel 4.9 fix script found, applying inline patches only"
           fi
