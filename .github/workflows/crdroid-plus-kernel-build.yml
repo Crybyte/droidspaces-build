@@ -275,6 +275,13 @@ jobs:
             KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v30.py" "$KSU_KERNEL_DIR" || echo "v30 script exited with code $?"
           fi
 
+          # CRITICAL FIX v31: Comprehensive multi-location patching
+          # This script must succeed - it patches critical kernel 4.9 compatibility issues
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v31.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v31 (Python) - COMPREHENSIVE ==="
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v31.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
           # CRITICAL: Apply pre-patched file LAST as final override
           # This ensures any corruptions from fix scripts are corrected
           if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
