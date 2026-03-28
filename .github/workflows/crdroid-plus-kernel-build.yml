@@ -249,8 +249,12 @@ jobs:
             fi
           fi
           
+          # CRITICAL FIX v22: Fixed ksu_umount_mnt(&path, flags) handling
+          if [ -f "build-scripts/fix_kernelsu_49_v22.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v22 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v22.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v21: Fixed ksu_umount_mnt call handling (v18 had broken regex)
-          if [ -f "build-scripts/fix_kernelsu_49_v21.py" ]; then
+          elif [ -f "build-scripts/fix_kernelsu_49_v21.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v21 (Python) ==="
             KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v21.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v18: Ultra-aggressive fix for all flags-related issues
