@@ -446,7 +446,7 @@ jobs:
             KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
           elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ]; then
             echo "Running kernel 4.9 compatibility fix script v39 from repo root..."
-            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ~/kernel_build/android_kernel_oneplus_sdm845
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
           # Verification: Show line 591 of core_hook.c to verify the fix

@@ -87,7 +87,7 @@ asmlinkage long sys_umount(const char __user *name, int flags);
 
 
 def process_core_hook_files(kernel_dir):
-    """Process all possible core_hook.c locations"""
+    """Process all possible core_hook.c locations with deduplication"""
 
     possible_paths = [
         os.path.join(kernel_dir, 'drivers/kernelsu/core_hook.c'),
@@ -97,24 +97,34 @@ def process_core_hook_files(kernel_dir):
     ]
 
     results = []
+    seen_paths = set()  # Track processed real paths to avoid duplicates
+
     for path in possible_paths:
-        real_path = os.path.realpath(path) if os.path.exists(path) else path
-        if os.path.exists(real_path):
-            print(f"\nProcessing: {real_path}")
+        if not os.path.exists(path):
+            continue
 
-            # Apply aggressive umount fix
-            fixed, msg = aggressive_umount_fix(real_path)
-            if fixed:
-                print(f"  [FIXED] {msg}")
-            else:
-                print(f"  [INFO] {msg}")
+        real_path = os.path.realpath(path)
 
-            # Ensure declaration exists
-            declared, msg = ensure_sys_umount_declaration(real_path)
-            if declared:
-                print(f"  [DECLARED] {msg}")
+        # Skip if we've already processed this real file
+        if real_path in seen_paths:
+            continue
+        seen_paths.add(real_path)
 
-            results.append((real_path, fixed, declared))
+        print(f"\nProcessing: {real_path}")
+
+        # Apply aggressive umount fix
+        fixed, msg = aggressive_umount_fix(real_path)
+        if fixed:
+            print(f"  [FIXED] {msg}")
+        else:
+            print(f"  [INFO] {msg}")
+
+        # Ensure declaration exists
+        declared, msg = ensure_sys_umount_declaration(real_path)
+        if declared:
+            print(f"  [DECLARED] {msg}")
+
+        results.append((real_path, fixed, declared))
 
     return results
 
@@ -145,15 +155,15 @@ def main():
     print("=" * 60)
 
     if results:
-        for path, fixed, declared in results:
+        for path, fixed, _declared in results:
             status = "FIXED" if fixed else "OK"
             print(f"  [{status}] {path}")
         print("\nv39 fix applied. Build should now succeed.")
         return 0
-    else:
-        print("  WARNING: No core_hook.c files found!")
-        print(f"  Searched in: {kernel_dir}")
-        return 1
+
+    print("  WARNING: No core_hook.c files found!")
+    print(f"  Searched in: {kernel_dir}")
+    return 1
 
 
 if __name__ == "__main__":
