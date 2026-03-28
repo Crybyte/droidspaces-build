@@ -105,33 +105,9 @@ jobs:
               # Create a backup
               cp KernelSU/kernel/core_hook.c KernelSU/kernel/core_hook.c.bak
               
-              # Use a Python script for more robust patching
-              python3 << 'PYEOF'
-import re
-
-with open('KernelSU/kernel/core_hook.c', 'r') as f:
-    content = f.read()
-
-# Pattern 1: path_umount(path, flags); -> umount(mnt_point);
-# This handles the common case where path_umount is called
-content = re.sub(
-    r'path_umount\s*\(\s*path\s*,\s*[^)]+\s*\)\s*;',
-    'umount(mnt_point);  // path_umount replaced for kernel 4.9 compat',
-    content
-)
-
-# Pattern 2: path_umount(some_path_var, flags) -> umount(mnt_point)
-content = re.sub(
-    r'path_umount\s*\(\s*([^,]+)\s*,\s*[^)]+\s*\)',
-    r'umount(mnt_point);  // path_umount(, ...) replaced for kernel 4.9 compat',
-    content
-)
-
-with open('KernelSU/kernel/core_hook.c', 'w') as f:
-    f.write(content)
-
-print("Patched path_umount calls")
-PYEOF
+              # Use perl for robust regex replacement
+              # Pattern: path_umount(anything, flags) -> umount(mnt_point);
+              perl -i -pe 's/path_umount\s*\(\s*[^,]+\s*,[^)]+\)/umount(mnt_point)/g' KernelSU/kernel/core_hook.c
               
               # Verify the patch was applied
               if grep -q "path_umount" KernelSU/kernel/core_hook.c; then
@@ -147,7 +123,7 @@ PYEOF
           for file in KernelSU/kernel/*.c; do
             if [ -f "$file" ] && grep -q "path_umount" "$file"; then
               echo "Found path_umount in $file - patching..."
-              sed -i 's/path_umount([^)]*)/umount(mnt_point)/g' "$file" || true
+              perl -i -pe 's/path_umount\s*\(\s*[^,]+\s*,[^)]+\)/umount(mnt_point)/g' "$file"
             fi
           done
 
