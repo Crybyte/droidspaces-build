@@ -391,6 +391,29 @@ jobs:
             KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v36.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
+          # CRITICAL FIX v37: Remove -DKSU_UMOUNT from Makefile
+          # The Makefile unconditionally adds -DKSU_UMOUNT which forces path_umount() usage
+          # path_umount doesn't exist in kernel 4.9, causing undefined reference errors
+          # This fix removes the flag so code falls through to -ENOSYS branch
+          echo "=== CRITICAL FIX v37: Removing -DKSU_UMOUNT from KernelSU Makefile ==="
+          echo "This prevents undefined reference to umount/path_umount in kernel 4.9"
+
+          # Check for v37 script in both locations (repo root and build-scripts/)
+          V37_SCRIPT=""
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v37.py" ]; then
+            V37_SCRIPT="$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v37.py"
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v37.py" ]; then
+            V37_SCRIPT="$GITHUB_WORKSPACE/fix_kernelsu_49_v37.py"
+          fi
+
+          if [ -n "$V37_SCRIPT" ]; then
+            echo "Running kernel 4.9 compatibility fix script v37 (Python)..."
+            echo "Script path: $V37_SCRIPT"
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$V37_SCRIPT" ~/kernel-build/android_kernel_oneplus_sdm845
+          else
+            echo "WARNING: fix_kernelsu_49_v37.py not found in build-scripts/ or repo root"
+          fi
+
           # Verification: Show line 591 of core_hook.c to verify the fix
           echo "=== Verifying core_hook.c line 591 (flags fix) ==="
           CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
