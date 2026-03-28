@@ -235,26 +235,6 @@ jobs:
             fi
           done
           
-          # Run external fix script for kernel 4.9 compatibility
-          # This handles the try_umount function DEFINITION (not just calls)
-          if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
-            echo "=== Applying pre-patched core_hook.c for kernel 4.9 compatibility ==="
-            KSU_CORE_HOOK="$KSU_KERNEL_DIR/core_hook.c"
-            if [ -f "$KSU_CORE_HOOK" ]; then
-              cp "$KSU_CORE_HOOK" "${KSU_CORE_HOOK}.orig"
-              cp "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" "$KSU_CORE_HOOK"
-              echo "SUCCESS: Replaced core_hook.c with kernel 4.9 compatible version"
-              # Verify the patch
-              if grep -q "kmalloc(PATH_MAX" "$KSU_CORE_HOOK"; then
-                echo "VERIFIED: core_hook.c contains kernel 4.9 compatible code"
-              else
-                echo "WARNING: core_hook.c may not be properly patched"
-              fi
-            else
-              echo "WARNING: core_hook.c not found at $KSU_CORE_HOOK"
-            fi
-          fi
-          
           # CRITICAL FIX v29: Comprehensive fix for kernel 4.9 compatibility
           # This runs ALL scripts with v29 first to ensure consistency
           echo "=== Running ALL available kernel 4.9 compatibility fix scripts ==="
@@ -287,6 +267,24 @@ jobs:
           if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v25 (Python) ==="
             KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR" || echo "v25 script exited with code $?"
+          fi
+
+          # CRITICAL FIX v30: Ultra-aggressive fix as final safety net
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v30.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v30 (Python) - ULTRA-AGGRESSIVE ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v30.py" "$KSU_KERNEL_DIR" || echo "v30 script exited with code $?"
+          fi
+
+          # CRITICAL: Apply pre-patched file LAST as final override
+          # This ensures any corruptions from fix scripts are corrected
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
+            echo "=== Applying pre-patched core_hook.c as FINAL OVERRIDE ==="
+            KSU_CORE_HOOK="$KSU_KERNEL_DIR/core_hook.c"
+            if [ -f "$KSU_CORE_HOOK" ]; then
+              cp "$KSU_CORE_HOOK" "${KSU_CORE_HOOK}.prepatch.bak"
+              cp "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" "$KSU_CORE_HOOK"
+              echo "SUCCESS: Replaced core_hook.c with kernel 4.9 compatible version (FINAL)"
+            fi
           fi
 
           # Verification: Show line 591 of core_hook.c to verify the fix
