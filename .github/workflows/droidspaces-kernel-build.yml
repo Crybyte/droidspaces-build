@@ -158,7 +158,7 @@ jobs:
           name: kernel-${{ env.DEVICE }}-${{ github.run_number }}
           path: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dt*
             ~/kernel-build/android_kernel_oneplus_sdm845/build.log
           retention-days: 30
           if-no-files-found: error
@@ -195,6 +195,6 @@ jobs:
             - ANDROID_PARANOID_NETWORK disabled
           files: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
-            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dtb
+            ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dt*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
