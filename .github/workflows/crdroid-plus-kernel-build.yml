@@ -94,38 +94,101 @@ jobs:
           # FIX: Patch KernelSU for kernel 4.9 compatibility
           # path_umount() doesn't exist in kernel 4.9 (introduced in 5.x)
           echo "=== Patching KernelSU for kernel 4.9 compatibility ==="
-          if [ -f "KernelSU/kernel/core_hook.c" ]; then
-            # Count occurrences of path_umount
-            PATH_UMOUNT_COUNT=$(grep -c "path_umount" KernelSU/kernel/core_hook.c || echo "0")
-            echo "Found $PATH_UMOUNT_COUNT occurrences of path_umount"
-            
-            if [ "$PATH_UMOUNT_COUNT" -gt 0 ]; then
-              echo "Applying kernel 4.9 compatibility patch for path_umount..."
-              
-              # Create a backup
-              cp KernelSU/kernel/core_hook.c KernelSU/kernel/core_hook.c.bak
-              
-              # Use perl for robust regex replacement
-              # Pattern: path_umount(anything, flags) -> umount(mnt_point);
-              perl -i -pe 's/path_umount\s*\(\s*[^,]+\s*,[^)]+\)/umount(mnt_point)/g' KernelSU/kernel/core_hook.c
-              
-              # Verify the patch was applied
-              if grep -q "path_umount" KernelSU/kernel/core_hook.c; then
-                echo "WARNING: path_umount still found after patching!"
-                grep -n "path_umount" KernelSU/kernel/core_hook.c | head -5
-              else
-                echo "SUCCESS: All path_umount calls have been replaced"
-              fi
+          
+          # CRITICAL FIX: The setup.sh creates KernelSU-Next and symlinks drivers/kernelsu -> KernelSU-Next/kernel
+          # If we manually cloned to KernelSU, we need to update the symlink to point to the right place
+          if [ -d "KernelSU" ] && [ -L "drivers/kernelsu" ]; then
+            echo "Fixing kernelsu symlink to point to KernelSU/kernel..."
+            rm -f drivers/kernelsu
+            ln -sf "$(realpath --relative-to="drivers" "KernelSU/kernel")" drivers/kernelsu
+            echo "Symlink updated: drivers/kernelsu -> $(readlink drivers/kernelsu)"
+          fi
+          
+          # Determine which kernel directory to patch
+          # Priority: drivers/kernelsu (what's actually being compiled) -> KernelSU-Next/kernel -> KernelSU/kernel
+          KSU_KERNEL_DIR=""
+          if [ -d "drivers/kernelsu" ]; then
+            # Get the real path of the symlink
+            KSU_REAL_PATH=$(readlink -f drivers/kernelsu 2>/dev/null || echo "")
+            if [ -n "$KSU_REAL_PATH" ]; then
+              KSU_KERNEL_DIR="$KSU_REAL_PATH"
+              echo "Found kernelsu at: $KSU_KERNEL_DIR"
             fi
           fi
           
-          # Also check and patch any other files that might use path_umount
-          for file in KernelSU/kernel/*.c; do
-            if [ -f "$file" ] && grep -q "path_umount" "$file"; then
-              echo "Found path_umount in $file - patching..."
-              perl -i -pe 's/path_umount\s*\(\s*[^,]+\s*,[^)]+\)/umount(mnt_point)/g' "$file"
+          # Also check KernelSU-Next/kernel directly
+          if [ -z "$KSU_KERNEL_DIR" ] && [ -d "KernelSU-Next/kernel" ]; then
+            KSU_KERNEL_DIR="KernelSU-Next/kernel"
+            echo "Using KernelSU-Next/kernel"
+          fi
+          
+          # Fallback to KernelSU/kernel
+          if [ -z "$KSU_KERNEL_DIR" ] && [ -d "KernelSU/kernel" ]; then
+            KSU_KERNEL_DIR="KernelSU/kernel"
+            echo "Using KernelSU/kernel"
+          fi
+          
+          if [ -z "$KSU_KERNEL_DIR" ]; then
+            echo "ERROR: Could not find KernelSU kernel directory!"
+            exit 1
+          fi
+          
+          # Find all .c files in the kernel directory and patch them
+          PATCH_COUNT=0
+          for file in "$KSU_KERNEL_DIR"/*.c; do
+            if [ -f "$file" ]; then
+              FILE_NAME=$(basename "$file")
+              
+              # Count occurrences of path_umount
+              PATH_UMOUNT_COUNT=$(grep -c "path_umount" "$file" 2>/dev/null || echo "0")
+              
+              if [ "$PATH_UMOUNT_COUNT" -gt 0 ]; then
+                echo "Found $PATH_UMOUNT_COUNT occurrences of path_umount in $FILE_NAME"
+                echo "Applying kernel 4.9 compatibility patch..."
+                
+                # Create a backup
+                cp "$file" "${file}.bak"
+                
+                # AGGRESSIVE path_umount patching for kernel 4.9
+                # path_umount was introduced in kernel 5.9, doesn't exist in 4.9
+                # We need to replace path_umount(path, flags) with umount(path)
+                
+                # Strategy 1: Perl regex to handle path_umount(anything, flags)
+                perl -i -pe 's/path_umount\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/umount($1)/g' "$file"
+                
+                # Strategy 2: Alternative pattern with different spacing
+                perl -i -pe 's/path_umount\s*\(\s*([^,\s]+)\s*,[^)]+\)/umount($1)/g' "$file"
+                
+                # Strategy 3: Line-by-line replacement using sed for remaining cases
+                # This handles edge cases perl might miss
+                sed -i 's/path_umount[[:space:]]*(/umount(/g' "$file"
+                
+                # Remove the second argument (flags) - common patterns
+                sed -i 's/,[[:space:]]*MNT_DETACH[[:space:]]*)/)/g' "$file"
+                sed -i 's/,[[:space:]]*0[[:space:]]*)/)/g' "$file"
+                sed -i 's/,[[:space:]]*UMOUNT_NOFOLLOW[[:space:]]*)/)/g' "$file"
+                
+                # Verify the patch was applied
+                REMAINING=$(grep -c "path_umount" "$file" 2>/dev/null || echo "0")
+                if [ "$REMAINING" -gt 0 ]; then
+                  echo "WARNING: $REMAINING path_umount calls still found in $FILE_NAME after patching!"
+                  grep -n "path_umount" "$file" | head -10
+                  echo "ERROR: Failed to patch all path_umount calls"
+                  exit 1
+                else
+                  echo "SUCCESS: All path_umount calls replaced in $FILE_NAME"
+                  PATCH_COUNT=$((PATCH_COUNT + PATH_UMOUNT_COUNT))
+                fi
+              fi
             fi
           done
+          
+          echo "=== Patching complete: $PATCH_COUNT path_umount calls replaced ==="
+          
+          # Verify the symlink is correct
+          echo "=== Final verification ==="
+          ls -la drivers/kernelsu 2>/dev/null || echo "drivers/kernelsu not found"
+          echo "Symlink points to: $(readlink -f drivers/kernelsu 2>/dev/null || echo 'N/A')"
 
       - name: Add susfs patches (v1.5.5 for kernel 4.9)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
