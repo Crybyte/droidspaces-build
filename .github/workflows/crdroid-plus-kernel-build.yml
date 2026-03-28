@@ -295,6 +295,34 @@ jobs:
           else
             echo "WARNING: Could not find core_hook.c for verification"
           fi
+          echo "=== CRITICAL FIX v42: Direct fix for line 131 current_thread_info()->0 ==="
+          
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v42.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v42..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v42.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v42.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v42 from repo root..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v42.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+          
+          # Verification: Show line 131 of core_hook.c to verify the fix
+          echo "=== Verifying core_hook.c line 131 (disable_seccomp function) ==="
+          CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
+            echo "core_hook.c line 131:"
+            sed -n '131p' "$CORE_HOOK_FILE"
+            # Check if it still contains '->0'
+            if sed -n '131p' "$CORE_HOOK_FILE" | grep -q 'current_thread_info()->0'; then
+              echo "ERROR: Line 131 still has current_thread_info()->0 - build will fail!"
+              exit 1
+            else
+              echo "OK: Line 131 is fixed"
+            fi
+          else
+            echo "WARNING: Could not find core_hook.c for verification"
+          fi
+
+
 
       - name: Add susfs patches (DISABLED - causing build failures)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
