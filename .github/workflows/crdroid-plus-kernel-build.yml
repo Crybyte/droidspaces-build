@@ -249,9 +249,13 @@ jobs:
             fi
           fi
           
+          # CRITICAL FIX v18: Ultra-aggressive fix for all flags-related issues
+          # This handles ALL function signatures with flags parameters - FIXED function signature removal
+          if [ -f "build-scripts/fix_kernelsu_49_v18.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v18 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v18.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v17: Ultra-aggressive fix for all flags-related issues
-          # This handles ALL function signatures with flags parameters
-          if [ -f "build-scripts/fix_kernelsu_49_v17.py" ]; then
+          elif [ -f "build-scripts/fix_kernelsu_49_v17.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v17 (Python) ==="
             KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v17.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v16: Run comprehensive Python fixer to catch any remaining issues
