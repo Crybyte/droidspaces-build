@@ -210,9 +210,15 @@ jobs:
                   echo "Patched try_umount calls in $FILE_NAME"
                 fi
               fi
-              
+            fi
+          done
+          
           # Run external fix script for kernel 4.9 compatibility
-          if [ -f "build-scripts/fix-kernelsu-49-v2.sh" ]; then
+          # This handles the try_umount function DEFINITION (not just calls)
+          if [ -f "build-scripts/fix_kernelsu_49.py" ]; then
+            echo "=== Running kernel 4.9 compatibility Python fixer ==="
+            python3 build-scripts/fix_kernelsu_49.py "$KSU_KERNEL_DIR"
+          elif [ -f "build-scripts/fix-kernelsu-49-v2.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v2 ==="
             chmod +x build-scripts/fix-kernelsu-49-v2.sh
             build-scripts/fix-kernelsu-49-v2.sh "$KSU_KERNEL_DIR"
@@ -221,10 +227,8 @@ jobs:
             chmod +x build-scripts/fix-kernelsu-49.sh
             build-scripts/fix-kernelsu-49.sh "$KSU_KERNEL_DIR"
           else
-            echo "WARNING: fix-kernelsu-49.sh not found, applying inline patches only"
+            echo "WARNING: No kernel 4.9 fix script found, applying inline patches only"
           fi
-            fi
-          done
           
           echo "=== Patching complete: $PATCH_COUNT path_umount calls replaced ==="
           
