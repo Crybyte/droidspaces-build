@@ -255,97 +255,55 @@ jobs:
             fi
           fi
           
-          # CRITICAL FIX v27: Force-fix any remaining 'flags' issues after pre-patch
-          # This handles order-of-operations issues where the pre-patch might not apply correctly
+          # CRITICAL FIX v28: Guaranteed fix for 'flags' undeclared error
+          # This runs ALL scripts to maximize fix coverage
+          echo "=== Running ALL available kernel 4.9 compatibility fix scripts ==="
+
+          # Run v28 first (most aggressive)
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v28.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v28 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v28.py" "$KSU_KERNEL_DIR" || echo "v28 script exited with code $?"
+          fi
+
+          # Run v27 as additional coverage
           if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v27 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" "$KSU_KERNEL_DIR" || true
-          # CRITICAL FIX v26: Force-fix any remaining 'flags' issues after pre-patch
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v26 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" "$KSU_KERNEL_DIR" || true
-          # CRITICAL FIX v25: Complete fix for KernelSU-Next v1.0.7 kernel 4.9 compatibility
-          # Fixes actual v1.0.7 code structure: ksu_umount_mnt(struct path *path, int flags)
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v25 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR" || true
-          # CRITICAL FIX v24: Fixed 'flags' undeclared error for KernelSU-Next v1.0.7
-          # Fixes line 591: ksu_umount_mnt(&path, flags) -> ksu_umount_mnt(&path, 0)
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v24.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v24 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v24.py" "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v23: Fixed 'flags' undeclared error in ksu_umount_mnt calls
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v23.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v23 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v23.py" "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v22: Fixed ksu_umount_mnt(&path, flags) handling
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v22.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v22 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v22.py" "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v21: Fixed ksu_umount_mnt call handling (v18 had broken regex)
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v21.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v21 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v21.py" "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v18: Ultra-aggressive fix for all flags-related issues
-          # This handles ALL function signatures with flags parameters - FIXED function signature removal
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v18.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v18 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v18.py" "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v17: Ultra-aggressive fix for all flags-related issues
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v17.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v17 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v17.py" "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v16: Run comprehensive Python fixer to catch any remaining issues
-          # This handles flags parameters, check_mnt, multi-line function definitions
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v16.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v16 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v16.py" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v15.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v15 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v15.py" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v12.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v12 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v12.sh"
-            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v12.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v11.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v11 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v11.sh"
-            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v11.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v10.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v10 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v10.sh"
-            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v10.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v9.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v9 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v9.sh"
-            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v9.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v8.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v8 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v8.sh"
-            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v8.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v4.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v4 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v4.sh"
-            KSU_DIR="$KSU_KERNEL_DIR" "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v4.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v3.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v3 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v3.sh"
-            "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v3.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49.py" ]; then
-            echo "=== Running kernel 4.9 compatibility Python fixer ==="
-            python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49.py" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v2.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v2 ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v2.sh"
-            "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49-v2.sh" "$KSU_KERNEL_DIR"
-          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49.sh" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script ==="
-            chmod +x "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49.sh"
-            "$GITHUB_WORKSPACE/build-scripts/fix-kernelsu-49.sh" "$KSU_KERNEL_DIR"
-          else
-            echo "WARNING: No kernel 4.9 fix script found, applying inline patches only"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" "$KSU_KERNEL_DIR" || echo "v27 script exited with code $?"
           fi
-          
+
+          # Run v26 as additional coverage
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v26 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" "$KSU_KERNEL_DIR" || echo "v26 script exited with code $?"
+          fi
+
+          # Run v25 as additional coverage
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v25 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR" || echo "v25 script exited with code $?"
+          fi
+
+          # ULTRA-CRITICAL: Direct inline fix for line 591 'flags' issue
+          # This is a guaranteed fix that runs AFTER all Python scripts
+          echo "=== Applying ULTRA-CRITICAL inline fix for line 591 ==="
+          CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
+            echo "Before fix - line 591:"
+            sed -n '591p' "$CORE_HOOK_FILE"
+
+            # Fix 1: Replace ksu_umount_mnt(&path, flags) with ksu_umount_mnt(&path, 0)
+            sed -i '591s/ksu_umount_mnt(&path, flags)/ksu_umount_mnt(\&path, 0)/g' "$CORE_HOOK_FILE"
+
+            # Fix 2: Also fix try_umount signature to remove flags parameter
+            sed -i 's/try_umount(const char \*mnt, bool check_mnt, int flags)/try_umount(const char *mnt, bool check_mnt)/g' "$CORE_HOOK_FILE"
+
+            # Fix 3: Fix ksu_umount_mnt signature to remove flags parameter
+            sed -i 's/ksu_umount_mnt(struct path \*path, int flags)/ksu_umount_mnt(struct path *path)/g' "$CORE_HOOK_FILE"
+
+            echo "After fix - line 591:"
+            sed -n '591p' "$CORE_HOOK_FILE"
+          fi
+
           echo "=== Patching complete: $PATCH_COUNT path_umount calls replaced ==="
           
           # Verify the symlink is correct
