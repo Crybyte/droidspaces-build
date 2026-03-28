@@ -249,8 +249,13 @@ jobs:
             fi
           fi
           
+          # CRITICAL FIX v23: Fixed 'flags' undeclared error in ksu_umount_mnt calls
+          # Replaces ksu_umount_mnt(&path, flags) with ksu_umount_mnt(&path, 0)
+          if [ -f "build-scripts/fix_kernelsu_49_v23.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v23 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v23.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v22: Fixed ksu_umount_mnt(&path, flags) handling
-          if [ -f "build-scripts/fix_kernelsu_49_v22.py" ]; then
+          elif [ -f "build-scripts/fix_kernelsu_49_v22.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v22 (Python) ==="
             KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v22.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v21: Fixed ksu_umount_mnt call handling (v18 had broken regex)
