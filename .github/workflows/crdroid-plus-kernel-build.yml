@@ -319,6 +319,37 @@ jobs:
             ls -la drivers/kernelsu/ 2>/dev/null || echo "drivers/kernelsu not found"
           fi
           
+          # CRITICAL FIX v33: Fix ksu_umount_mnt function signature mismatch
+          # The function declaration at line 563 expects 2 args but call at line 591 has 1
+          # This causes "too few arguments to function 'ksu_umount_mnt'" error
+          echo "=== CRITICAL FIX v33: Fixing ksu_umount_mnt function signature ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v33.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v33 (Python)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v33.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
+          # Also apply direct sed fixes for the function declaration at line 563
+          CORE_HOOK_ACTUAL=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_ACTUAL" ] && [ -f "$CORE_HOOK_ACTUAL" ]; then
+            echo "Fixing function declaration at line 563..."
+
+            # Show line 563 before fix
+            echo "Line 563 BEFORE fix:"
+            sed -n '563p' "$CORE_HOOK_ACTUAL"
+
+            # Fix the function declaration: remove 'int flags' parameter
+            sed -i '563s/ksu_umount_mnt(struct path \*path, int flags)/ksu_umount_mnt(struct path *path)/' "$CORE_HOOK_ACTUAL"
+
+            # Also try without the 'static int' prefix in case line number shifted
+            sed -i 's/ksu_umount_mnt(struct path \*path, int flags)/ksu_umount_mnt(struct path *path)/g' "$CORE_HOOK_ACTUAL"
+
+            echo "Line 563 AFTER fix:"
+            sed -n '563p' "$CORE_HOOK_ACTUAL"
+
+            echo "SUCCESS: Applied function declaration fix v33"
+          fi
+
           # CRITICAL: Apply pre-patched file LAST as final override (fallback)
           # This ensures any corruptions from fix scripts are corrected
           if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
