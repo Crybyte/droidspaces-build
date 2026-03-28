@@ -247,6 +247,13 @@ jobs:
             else
               echo "WARNING: core_hook.c not found at $KSU_CORE_HOOK"
             fi
+          fi
+          
+          # CRITICAL FIX v15: Run comprehensive Python fixer to catch any remaining issues
+          # This handles flags parameters, check_mnt, and any edge cases missed by above patches
+          if [ -f "build-scripts/fix_kernelsu_49_v15.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v15 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v15.py "$KSU_KERNEL_DIR"
           elif [ -f "build-scripts/fix-kernelsu-49-v12.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v12 ==="
             chmod +x build-scripts/fix-kernelsu-49-v12.sh
