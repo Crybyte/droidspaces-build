@@ -54,13 +54,15 @@ def apply_prepatched_file(prepatched_path, target_path):
         shutil.copy2(prepatched_path, target_path)
         
         # Verify line 591
-        with open(target_path, 'r') as f:
+        with open(target_path) as f:
             lines = f.readlines()
-            if len(lines) >= 591:
-                line_591 = lines[590].strip()
-                if 'flags' in line_591 and 'ksu_umount_mnt' in line_591:
-                    print(f"  ERROR: Line 591 still has 'flags' after copy!")
-                    return False
+            if len(lines) < 591:
+                print(f"  ERROR: File has only {len(lines)} lines; expected at least 591")
+                return False
+            line_591 = lines[590].strip()
+            if 'flags' in line_591 and 'ksu_umount_mnt' in line_591:
+                print(f"  ERROR: Line 591 still has 'flags' after copy in {target_path}!")
+                return False
         
         return True
     except Exception as e:
@@ -70,13 +72,14 @@ def apply_prepatched_file(prepatched_path, target_path):
 def verify_line_591(filepath):
     """Verify line 591 is fixed"""
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath) as f:
             lines = f.readlines()
-            if len(lines) >= 591:
-                line_591 = lines[590].rstrip()
-                print(f"  Line 591: {line_591[:80]}")
-                if 'flags' in line_591 and 'ksu_umount_mnt' in line_591:
-                    return False, "Line 591 still contains 'flags' variable"
+            if len(lines) < 591:
+                return False, f"File has only {len(lines)} lines; missing line 591"
+            line_591 = lines[590].rstrip()
+            print(f"  Line 591: {line_591[:80]}")
+            if 'flags' in line_591 and 'ksu_umount_mnt' in line_591:
+                return False, "Line 591 still contains 'flags' variable"
         return True, "Line 591 looks correct"
     except Exception as e:
         return False, f"Error reading file: {e}"
@@ -123,7 +126,7 @@ def main():
         print(f"\nPatching: {target_path}")
         if apply_prepatched_file(prepatched_path, target_path):
             success_count += 1
-            print(f"  SUCCESS: Applied pre-patched file")
+            print("  SUCCESS: Applied pre-patched file")
             # Verify
             ok, msg = verify_line_591(target_path)
             print(f"  Verification: {msg}")

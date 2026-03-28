@@ -276,9 +276,10 @@ jobs:
           fi
 
           # CRITICAL FIX v31: Comprehensive multi-location patching
+          # This script must succeed - it patches critical kernel 4.9 compatibility issues
           if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v31.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v31 (Python) - COMPREHENSIVE ==="
-            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v31.py" ~/kernel-build/android_kernel_oneplus_sdm845 || echo "v31 script exited with code $?"
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v31.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
           # CRITICAL: Apply pre-patched file LAST as final override
