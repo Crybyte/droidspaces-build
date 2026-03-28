@@ -580,7 +580,8 @@ static int ksu_umount_mnt(struct path *path)
 	
 	pathname = dentry_path_raw(dentry, buf, PATH_MAX);
 	if (!IS_ERR(pathname)) {
-		err = umount(pathname);
+		// Kernel 4.9 uses sys_umount(path, flags) instead of umount(path)
+		err = sys_umount(pathname, 0);
 	}
 	kfree(buf);
 	return err;

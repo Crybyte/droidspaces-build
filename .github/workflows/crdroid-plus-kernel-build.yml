@@ -414,6 +414,43 @@ jobs:
             echo "WARNING: fix_kernelsu_49_v37.py not found in build-scripts/ or repo root"
           fi
 
+          # CRITICAL FIX v38: Replace umount() with sys_umount() for kernel 4.9
+          # The pre-patched core_hook.c.patched file still calls umount() which doesn't exist in 4.9
+          # Kernel 4.9 uses sys_umount(path, flags) for the umount syscall
+          echo "=== CRITICAL FIX v38: Replacing umount() with sys_umount() ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v38.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v38 (Python)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v38.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v38.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v38 from repo root..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v38.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          else
+            echo "WARNING: fix_kernelsu_49_v38.py not found - applying direct sed fix..."
+            # Direct fix: replace umount(pathname) with sys_umount(pathname, 0)
+            CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+            if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
+              echo "Applying direct sed fix to $CORE_HOOK_FILE"
+              sed -i 's/\bumount(pathname)/sys_umount(pathname, 0)/g' "$CORE_HOOK_FILE"
+              sed -i 's/\bumount(mnt)/sys_umount(mnt, 0)/g' "$CORE_HOOK_FILE"
+              echo "Direct sed fix applied"
+            fi
+          fi
+
+          # CRITICAL FIX v39: Comprehensive ksu_umount_mnt fix for kernel 4.9
+          # This is the final safety net to ensure all umount() calls are replaced
+          echo "=== CRITICAL FIX v39: Comprehensive ksu_umount_mnt fix ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v39 (Python)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v39 from repo root..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          else
+            echo "WARNING: fix_kernelsu_49_v39.py not found"
+          fi
+
           # Verification: Show line 591 of core_hook.c to verify the fix
           echo "=== Verifying core_hook.c line 591 (flags fix) ==="
           CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
