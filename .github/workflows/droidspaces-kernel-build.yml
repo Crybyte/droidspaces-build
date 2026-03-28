@@ -126,7 +126,7 @@ jobs:
           
           # Build kernel with warning suppressions for newer GCC
           make -j$(nproc) O=out ARCH=arm64 \
-            CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation -Wno-error=enum-int-mismatch -Wno-error=memset-elt-size -Wno-error=stringop-overread -Wno-error=duplicate-decl-specifier" \
+            CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation -Wno-error=enum-int-mismatch -Wno-error=memset-elt-size -Wno-error=stringop-overread -Wno-error=duplicate-decl-specifier -Wno-error=array-parameter=" \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             Image.gz \
