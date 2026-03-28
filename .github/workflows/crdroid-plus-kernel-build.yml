@@ -201,6 +201,14 @@ jobs:
               TRY_UMOUNT_COUNT=$(grep -c 'try_umount' "$file" 2>/dev/null || echo "0")
               if [ "$TRY_UMOUNT_COUNT" -gt 0 ]; then
                 echo "Found try_umount usage in $FILE_NAME - checking arguments..."
+                # Check if try_umount is being called with 3 arguments (v1.0.7 style)
+                THREE_ARG_TRY=$(grep -oE 'try_umount[[:space:]]*\([^,]+,[^,]+,[^)]+\)' "$file" 2>/dev/null | wc -l || echo "0")
+                if [ "$THREE_ARG_TRY" -gt 0 ]; then
+                  echo "Found 3-argument try_umount calls - patching..."
+                  # Replace try_umount(path, check_mnt, flags) - just use the path argument
+                  perl -i -pe 's/try_umount\s*\(\s*([^,]+)\s*,[^,]+,[^)]+\)/try_umount($1, false, 0)/g' "$file"
+                  echo "Patched 3-arg try_umount calls in $FILE_NAME"
+                fi
                 # Check if try_umount is being called with 2 arguments
                 TWO_ARG_TRY=$(grep -oE 'try_umount[[:space:]]*\([^,]+,[^)]+\)' "$file" 2>/dev/null | wc -l || echo "0")
                 if [ "$TWO_ARG_TRY" -gt 0 ]; then
@@ -210,12 +218,24 @@ jobs:
                   echo "Patched try_umount calls in $FILE_NAME"
                 fi
               fi
+              
+              # FIX: check_mnt variable issues in kernel 4.9
+              # Replace check_mnt with 0 in function context
+              if grep -q "check_mnt" "$file" 2>/dev/null; then
+                echo "Found check_mnt in $FILE_NAME - patching..."
+                # Replace check_mnt with false (0) to avoid undeclared errors
+                perl -i -pe 's/\bcheck_mnt\b/false/g' "$file"
+              fi
             fi
           done
           
           # Run external fix script for kernel 4.9 compatibility
           # This handles the try_umount function DEFINITION (not just calls)
-          if [ -f "build-scripts/fix-kernelsu-49-v3.sh" ]; then
+          if [ -f "build-scripts/fix-kernelsu-49-v4.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v4 ==="
+            chmod +x build-scripts/fix-kernelsu-49-v4.sh
+            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v4.sh "$KSU_KERNEL_DIR"
+          elif [ -f "build-scripts/fix-kernelsu-49-v3.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v3 ==="
             chmod +x build-scripts/fix-kernelsu-49-v3.sh
             build-scripts/fix-kernelsu-49-v3.sh "$KSU_KERNEL_DIR"
