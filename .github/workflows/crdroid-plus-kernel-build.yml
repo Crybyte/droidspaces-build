@@ -231,7 +231,11 @@ jobs:
           
           # Run external fix script for kernel 4.9 compatibility
           # This handles the try_umount function DEFINITION (not just calls)
-          if [ -f "build-scripts/fix-kernelsu-49-v8.sh" ]; then
+          if [ -f "build-scripts/fix-kernelsu-49-v9.sh" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v9 ==="
+            chmod +x build-scripts/fix-kernelsu-49-v9.sh
+            KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v9.sh "$KSU_KERNEL_DIR"
+          elif [ -f "build-scripts/fix-kernelsu-49-v8.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v8 ==="
             chmod +x build-scripts/fix-kernelsu-49-v8.sh
             KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v8.sh "$KSU_KERNEL_DIR"
