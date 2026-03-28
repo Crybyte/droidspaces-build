@@ -372,6 +372,16 @@ jobs:
             fi
           fi
 
+          # CRITICAL FIX v35: Fix undefined reference to umount with sys_umount
+          # v34 attempted to use ksys_umount but kernel 4.9 needs sys_umount
+          # This runs AFTER pre-patched file to fix any remaining umount() calls
+          echo "=== CRITICAL FIX v35: Fixing umount -> sys_umount for kernel 4.9 ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v35.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v35 (Python)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v35.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
           # Verification: Show line 591 of core_hook.c to verify the fix
           echo "=== Verifying core_hook.c line 591 (flags fix) ==="
           CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
