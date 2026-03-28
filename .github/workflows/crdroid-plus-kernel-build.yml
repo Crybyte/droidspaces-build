@@ -255,9 +255,13 @@ jobs:
             fi
           fi
           
-          # CRITICAL FIX v26: Force-fix any remaining 'flags' issues after pre-patch
+          # CRITICAL FIX v27: Force-fix any remaining 'flags' issues after pre-patch
           # This handles order-of-operations issues where the pre-patch might not apply correctly
-          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" ]; then
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v27 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" "$KSU_KERNEL_DIR" || true
+          # CRITICAL FIX v26: Force-fix any remaining 'flags' issues after pre-patch
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v26 (Python) ==="
             KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" "$KSU_KERNEL_DIR" || true
           # CRITICAL FIX v25: Complete fix for KernelSU-Next v1.0.7 kernel 4.9 compatibility
@@ -348,6 +352,22 @@ jobs:
           echo "=== Final verification ==="
           ls -la drivers/kernelsu 2>/dev/null || echo "drivers/kernelsu not found"
           echo "Symlink points to: $(readlink -f drivers/kernelsu 2>/dev/null || echo 'N/A')"
+          
+          # CRITICAL: Show line 591 of core_hook.c to verify the fix
+          echo "=== Verifying core_hook.c line 591 (flags fix) ==="
+          CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
+            echo "core_hook.c line 591:"
+            sed -n '591p' "$CORE_HOOK_FILE"
+            # Check if it still contains 'flags'
+            if sed -n '591p' "$CORE_HOOK_FILE" | grep -q 'flags'; then
+              echo "WARNING: Line 591 still contains 'flags' - build may fail!"
+            else
+              echo "OK: Line 591 does not contain 'flags'"
+            fi
+          else
+            echo "WARNING: Could not find core_hook.c for verification"
+          fi
 
       - name: Add susfs patches (DISABLED - causing build failures)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
