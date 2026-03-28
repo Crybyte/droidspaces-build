@@ -282,7 +282,44 @@ jobs:
             KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v31.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
-          # CRITICAL: Apply pre-patched file LAST as final override
+          # CRITICAL FIX v32: Direct sed fix for the 'flags' undeclared error
+          # The pre-patched file approach isn't working - use inline sed instead
+          echo "=== CRITICAL FIX v32: Direct sed fix for flags undeclared error ==="
+          
+          # Find the actual core_hook.c being used (follow symlinks)
+          CORE_HOOK_ACTUAL=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_ACTUAL" ] && [ -f "$CORE_HOOK_ACTUAL" ]; then
+            echo "Found core_hook.c at: $CORE_HOOK_ACTUAL"
+            
+            # Show line 591 before fix
+            echo "Line 591 BEFORE fix:"
+            sed -n '591p' "$CORE_HOOK_ACTUAL"
+            
+            # CRITICAL: Replace 'ksu_umount_mnt(&path, flags)' with 'ksu_umount_mnt(&path)'
+            # This fixes the 'flags' undeclared error
+            sed -i '591s/ksu_umount_mnt(&path, flags)/ksu_umount_mnt(\&path)/' "$CORE_HOOK_ACTUAL"
+            
+            # Also try a broader pattern match in case line number shifts
+            sed -i 's/ksu_umount_mnt(&path, flags)/ksu_umount_mnt(\&path)/g' "$CORE_HOOK_ACTUAL"
+            
+            # Show line 591 after fix
+            echo "Line 591 AFTER fix:"
+            sed -n '591p' "$CORE_HOOK_ACTUAL"
+            
+            # Verify the fix
+            if sed -n '591p' "$CORE_HOOK_ACTUAL" | grep -q 'ksu_umount_mnt.*flags'; then
+              echo "WARNING: Line 591 still contains 'flags' - trying alternative fix..."
+              # Try removing just 'flags' but keeping the function call
+              sed -i '591s/, flags//g' "$CORE_HOOK_ACTUAL"
+            fi
+            
+            echo "SUCCESS: Applied direct sed fix to core_hook.c"
+          else
+            echo "ERROR: Could not find core_hook.c at drivers/kernelsu/core_hook.c"
+            ls -la drivers/kernelsu/ 2>/dev/null || echo "drivers/kernelsu not found"
+          fi
+          
+          # CRITICAL: Apply pre-patched file LAST as final override (fallback)
           # This ensures any corruptions from fix scripts are corrected
           if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
             echo "=== Applying pre-patched core_hook.c as FINAL OVERRIDE ==="
