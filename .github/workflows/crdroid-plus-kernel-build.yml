@@ -255,11 +255,17 @@ jobs:
             fi
           fi
           
-          # CRITICAL FIX v28: Guaranteed fix for 'flags' undeclared error
-          # This runs ALL scripts to maximize fix coverage
+          # CRITICAL FIX v29: Comprehensive fix for kernel 4.9 compatibility
+          # This runs ALL scripts with v29 first to ensure consistency
           echo "=== Running ALL available kernel 4.9 compatibility fix scripts ==="
 
-          # Run v28 first (most aggressive)
+          # Run v29 first (comprehensive fix that handles both definitions and call sites)
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v29.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v29 (Python) - COMPREHENSIVE ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v29.py" "$KSU_KERNEL_DIR" || echo "v29 script exited with code $?"
+          fi
+
+          # Run v28 as additional coverage
           if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v28.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v28 (Python) ==="
             KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v28.py" "$KSU_KERNEL_DIR" || echo "v28 script exited with code $?"
@@ -283,25 +289,18 @@ jobs:
             KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR" || echo "v25 script exited with code $?"
           fi
 
-          # ULTRA-CRITICAL: Direct inline fix for line 591 'flags' issue
-          # This is a guaranteed fix that runs AFTER all Python scripts
-          echo "=== Applying ULTRA-CRITICAL inline fix for line 591 ==="
+          # Verification: Show line 591 of core_hook.c to verify the fix
+          echo "=== Verifying core_hook.c line 591 (flags fix) ==="
           CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
           if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
-            echo "Before fix - line 591:"
+            echo "core_hook.c line 591:"
             sed -n '591p' "$CORE_HOOK_FILE"
-
-            # Fix 1: Replace ksu_umount_mnt(&path, flags) with ksu_umount_mnt(&path, 0)
-            sed -i '591s/ksu_umount_mnt(&path, flags)/ksu_umount_mnt(\&path, 0)/g' "$CORE_HOOK_FILE"
-
-            # Fix 2: Also fix try_umount signature to remove flags parameter
-            sed -i 's/try_umount(const char \*mnt, bool check_mnt, int flags)/try_umount(const char *mnt, bool check_mnt)/g' "$CORE_HOOK_FILE"
-
-            # Fix 3: Fix ksu_umount_mnt signature to remove flags parameter
-            sed -i 's/ksu_umount_mnt(struct path \*path, int flags)/ksu_umount_mnt(struct path *path)/g' "$CORE_HOOK_FILE"
-
-            echo "After fix - line 591:"
-            sed -n '591p' "$CORE_HOOK_FILE"
+            # Check if it still contains 'flags' variable (not the parameter)
+            if sed -n '591p' "$CORE_HOOK_FILE" | grep -q 'ksu_umount_mnt.*flags)'; then
+              echo "WARNING: Line 591 still calls with 'flags' variable - build may fail!"
+            else
+              echo "OK: Line 591 call site is fixed"
+            fi
           fi
 
           echo "=== Patching complete: $PATCH_COUNT path_umount calls replaced ==="
