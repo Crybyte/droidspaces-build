@@ -382,6 +382,15 @@ jobs:
             KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v35.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
+          # CRITICAL FIX v36: More aggressive umount fix with detailed line analysis
+          # v35 missed some umount patterns - v36 has more comprehensive pattern matching
+          echo "=== CRITICAL FIX v36: Aggressive umount fix with line-by-line analysis ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v36.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v36 (Python)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v36.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
           # Verification: Show line 591 of core_hook.c to verify the fix
           echo "=== Verifying core_hook.c line 591 (flags fix) ==="
           CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
