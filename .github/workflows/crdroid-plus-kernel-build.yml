@@ -235,17 +235,17 @@ jobs:
             fi
           done
           
-          # CRITICAL FIX v29: Comprehensive fix for kernel 4.9 compatibility
+          # CRITICAL FIX v29-v39: Previous fixes consolidated
+          # v40: Properly handles flags variable declaration
 
-          # NOTE: Intermediate fixes v29-v38 consolidated into v39
-          echo "=== CRITICAL FIX v39: FINAL aggressive umount -> sys_umount fix ==="
+          echo "=== CRITICAL FIX v40: Proper flags variable handling for kernel 4.9 ==="
 
-          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ]; then
-            echo "Running kernel 4.9 compatibility fix script v39 (FINAL)..."
-            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
-          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ]; then
-            echo "Running kernel 4.9 compatibility fix script v39 from repo root..."
-            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v40.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v40..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v40.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v40.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v40 from repo root..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v40.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
           # Verification: Show line 591 of core_hook.c to verify the fix
