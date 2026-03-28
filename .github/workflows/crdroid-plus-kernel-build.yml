@@ -237,6 +237,7 @@ jobs:
           
           # CRITICAL FIX v29-v39: Previous fixes consolidated
           # v40: Properly handles flags variable declaration
+          # v41: Fixes current_thread_info()->0 syntax error
 
           echo "=== CRITICAL FIX v40: Proper flags variable handling for kernel 4.9 ==="
 
@@ -246,6 +247,16 @@ jobs:
           elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v40.py" ]; then
             echo "Running kernel 4.9 compatibility fix script v40 from repo root..."
             KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v40.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
+          echo "=== CRITICAL FIX v41: Fix current_thread_info()->0 syntax error ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v41.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v41..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v41.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v41.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v41 from repo root..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v41.py" ~/kernel-build/android_kernel_oneplus_sdm845
           fi
 
           # Verification: Show line 591 of core_hook.c to verify the fix
