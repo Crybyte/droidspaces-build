@@ -437,6 +437,18 @@ jobs:
             fi
           fi
 
+          # CRITICAL FIX v39: FINAL umount fix - runs AFTER pre-patched file
+          # The pre-patched file still contains umount() calls that don't exist in kernel 4.9
+          echo "=== CRITICAL FIX v39: FINAL aggressive umount -> sys_umount fix ==="
+
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v39 (FINAL)..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          elif [ -f "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ]; then
+            echo "Running kernel 4.9 compatibility fix script v39 from repo root..."
+            KERNEL_DIR=~/kernel-build/android_kernel_oneplus_sdm845 python3 "$GITHUB_WORKSPACE/fix_kernelsu_49_v39.py" ~/kernel-build/android_kernel_oneplus_sdm845
+          fi
+
           # Verification: Show line 591 of core_hook.c to verify the fix
           echo "=== Verifying core_hook.c line 591 (flags fix) ==="
           CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
