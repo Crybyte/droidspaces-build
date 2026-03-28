@@ -249,16 +249,10 @@ jobs:
             fi
           fi
           
-          # CRITICAL FIX v20: Ultra-aggressive fix for ALL remaining flags issues
-          # More comprehensive patterns for ksu_umount_mnt and try_umount function calls
-          if [ -f "build-scripts/fix_kernelsu_49_v20.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v20 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v20.py "$KSU_KERNEL_DIR"
-          # CRITICAL FIX v19: Fixed regex to properly handle struct member accesses (e.g., ->flags)
-          # Previous versions incorrectly replaced struct member accesses like current_thread_info()->flags
-          elif [ -f "build-scripts/fix_kernelsu_49_v19.py" ]; then
-            echo "=== Running kernel 4.9 compatibility fix script v19 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v19.py "$KSU_KERNEL_DIR"
+          # CRITICAL FIX v21: Fixed ksu_umount_mnt call handling (v18 had broken regex)
+          if [ -f "build-scripts/fix_kernelsu_49_v21.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v21 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 build-scripts/fix_kernelsu_49_v21.py "$KSU_KERNEL_DIR"
           # CRITICAL FIX v18: Ultra-aggressive fix for all flags-related issues
           # This handles ALL function signatures with flags parameters - FIXED function signature removal
           elif [ -f "build-scripts/fix_kernelsu_49_v18.py" ]; then
