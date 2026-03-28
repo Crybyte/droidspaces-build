@@ -220,72 +220,10 @@ jobs:
                 if grep -q 'static int try_umount(struct path \*path, bool check_mnt' "$file" 2>/dev/null; then
                   echo "Found 3-param try_umount definition - patching for kernel 4.9..."
                   
-                  # Create Python script for robust function replacement
-                  cat > /tmp/fix_try_umount.py << 'PYTHON_EOF'
-#!/usr/bin/env python3
-import re
-import sys
-
-def fix_try_umount(filepath):
-    with open(filepath, 'r') as f:
-        content = f.read()
-    
-    # Find the try_umount function (line by line approach for robustness)
-    lines = content.split('\n')
-    func_start = -1
-    func_end = -1
-    brace_count = 0
-    in_function = False
-    
-    for i, line in enumerate(lines):
-        if not in_function:
-            if re.search(r'static\s+int\s+try_umount\s*\(\s*struct\s+path\s*\*\s*path\s*,\s*bool\s+check_mnt', line):
-                func_start = i
-                in_function = True
-                brace_count = line.count('{') - line.count('}')
-        else:
-            brace_count += line.count('{') - line.count('}')
-            if brace_count == 0 and '{' in ''.join(lines[func_start:i+1]):
-                func_end = i
-                break
-    
-    if func_start >= 0 and func_end > func_start:
-        print(f"Found try_umount function from line {func_start+1} to {func_end+1}")
-        
-        # Kernel 4.9 compatible replacement function
-        replacement = '''static int try_umount(struct path *path)
-{
-	int err = 0;
-	struct mount *mnt = real_mount(path->mnt);
-
-	if (!should_umount(mnt)) {
-		return -EBUSY;
-	}
-
-	err = umount(path);
-	return err;
-}'''
-        
-        new_lines = lines[:func_start] + replacement.split('\n') + lines[func_end+1:]
-        with open(filepath, 'w') as f:
-            f.write('\n'.join(new_lines))
-        print("Successfully replaced try_umount function with kernel 4.9 compatible version")
-        return True
-    else:
-        print("Could not find try_umount function with 3 parameters")
-        return False
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <path_to_core_hook.c>")
-        sys.exit(1)
-    
-    filepath = sys.argv[1]
-    if fix_try_umount(filepath):
-        sys.exit(0)
-    else:
-        sys.exit(1)
-PYTHON_EOF
+                  # Create Python script for robust function replacement (base64 encoded to avoid YAML issues)
+                  echo "Creating Python fix script..."
+                  echo "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwppbXBvcnQgcmUKaW1wb3J0IHN5cwoKZGVmIGZpeF90cnlfdW1vdW50KGZpbGVwYXRoKToKICAgIHdpdGggb3BlbihmaWxlcGF0aCwgJ3InKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgCiAgICBsaW5lcyA9IGNvbnRlbnQuc3BsaXQoJwonKQogICAgZnVuY19zdGFydCA9IC0xCiAgICBmdW5jX2VuZCA9IC0xCiAgICBicmFjZV9jb3VudCA9IDAKICAgIGluX2Z1bmN0aW9uID0gRmFsc2UKICAgIAogICAgZm9yIGksIGxpbmUgaW4gZW51bWVyYXRlKGxpbmVzKToKICAgICAgICBpZiBub3QgaW5fZnVuY3Rpb246CiAgICAgICAgICAgIGlmIHJlLnNlYXJjaChyJ3N0YXRpY1xzK2ludFxzK3RyeV91bW91bnRccypcKFxzKnN0cnVjdFxzK3BhdGhccypcKlxzKnBhdGhccyosXHMqYm9vbFxzK2NoZWNrX21udCcsIGxpbmUpOgogICAgICAgICAgICAgICAgZnVuY19zdGFydCA9IGkKICAgICAgICAgICAgICAgIGluX2Z1bmN0aW9uID0gVHJ1ZQogICAgICAgICAgICAgICAgYnJhY2VfY291bnQgPSBsaW5lLmNvdW50KCd7JykgLSBsaW5lLmNvdW50KCd9JykKICAgICAgICBlbHNlOgogICAgICAgICAgICBicmFjZV9jb3VudCArPSBsaW5lLmNvdW50KCd7JykgLSBsaW5lLmNvdW50KCd9JykKICAgICAgICAgICAgaWYgYnJhY2VfY291bnQgPT0gMCBhbmQgJ3snIGluICcnLmpvaW4obGluZXNbZnVuY19zdGFydDppKzFdKToKICAgICAgICAgICAgICAgIGZ1bmNfZW5kID0gaQogICAgICAgICAgICAgICAgYnJlYWsKICAgIAogICAgaWYgZnVuY19zdGFydCA+PSAwIGFuZCBmdW5jX2VuZCA+IGZ1bmNfc3RhcnQ6CiAgICAgICAgcHJpbnQoZiJGb3VuZCB0cnlfdW1vdW50IGZ1bmN0aW9uIGZyb20gbGluZSB7ZnVuY19zdGFydCsxfSB0byB7ZnVuY19lbmQrMX0iKQogICAgICAgIAogICAgICAgIHJlcGxhY2VtZW50ID0gIiIic3RhdGljIGludCB0cnlfdW1vdW50KHN0cnVjdCBwYXRoICpwYXRoKQp7CglpbnQgZXJyID0gMDsKCXN0cnVjdCBtb3VudCAqbW50ID0gcmVhbF9tb3VudChwYXRoLT5tbnQpOwoKCWlmICghc2hvdWxkX3Vtb3VudChtbnQpKSB7CgkJcmV0dXJuIC1FQlVTWTsKCX0KCgllcnIgPSB1bW91bnQocGF0aCk7CglyZXR1cm4gZXJyOwp9IiIiCiAgICAgICAgCiAgICAgICAgbmV3X2xpbmVzID0gbGluZXNbOmZ1bmNfc3RhcnRdICsgcmVwbGFjZW1lbnQuc3BsaXQoJwonKSArIGxpbmVzW2Z1bmNfZW5kKzE6XQogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgJ3cnKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKCcKJy5qb2luKG5ld19saW5lcykpCiAgICAgICAgcHJpbnQoIlN1Y2Nlc3NmdWxseSByZXBsYWNlZCB0cnlfdW1vdW50IGZ1bmN0aW9uIHdpdGgga2VybmVsIDQuOSBjb21wYXRpYmxlIHZlcnNpb24iKQogICAgICAgIHJldHVybiBUcnVlCiAgICBlbHNlOgogICAgICAgIHByaW50KCJDb3VsZCBub3QgZmluZCB0cnlfdW1vdW50IGZ1bmN0aW9uIHdpdGggMyBwYXJhbWV0ZXJzIikKICAgICAgICByZXR1cm4gRmFsc2UKCmlmIF9fbmFtZV9fID09ICdfX21haW5fXyc6CiAgICBpZiBsZW4oc3lzLmFyZ3YpICE9IDI6CiAgICAgICAgcHJpbnQoZiJVc2FnZToge3N5cy5hcmd2WzBdfSA8cGF0aF90b19jb3JlX2hvb2suYz4iKQogICAgICAgIHN5cy5leGl0KDEpCiAgICAKICAgIGZpbGVwYXRoID0gc3lzLmFyZ3ZbMV0KICAgIGlmIGZpeF90cnlfdW1vdW50KGZpbGVwYXRoKToKICAgICAgICBzeXMuZXhpdCgwKQogICAgZWxzZToKICAgICAgICBzeXMuZXhpdCgxKQo=" | base64 -d > /tmp/fix_try_umount.py
+                  chmod +x /tmp/fix_try_umount.py
                   
                   # Run the Python fix script
                   python3 /tmp/fix_try_umount.py "$file"
