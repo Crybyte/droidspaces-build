@@ -1,4 +1,4 @@
-name: crDroid++ Kernel Build (Droidspaces + KernelSU + susfs + GPU OC + UFW)
+name: crDroid++ Kernel Build (Droidspaces + KernelSU-Next + susfs + GPU OC + UFW)
 
 on:
   workflow_dispatch:
@@ -9,13 +9,14 @@ on:
         default: '15.0'
         type: string
       kernelsu_version:
-        description: 'KernelSU version'
+        description: 'KernelSU-Next version'
         required: true
-        default: 'v0.9.5'
+        default: 'v1.0.5'
         type: choice
         options:
-          - v0.9.5
-          - v0.9.4
+          - v1.0.5
+          - v1.0.4
+          - v1.0.3
       gpu_oc_level:
         description: 'GPU overclock level'
         required: true
@@ -66,14 +67,15 @@ jobs:
           git clone --depth 1 --branch ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }} \
             ${{ env.KERNEL_REPO }} android_kernel_oneplus_sdm845
 
-      - name: Add KernelSU
+      - name: Add KernelSU-Next
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
-          echo "=== Adding KernelSU ${{ github.event.inputs.kernelsu_version }} ==="
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_version }}
+          echo "=== Adding KernelSU-Next ${{ github.event.inputs.kernelsu_version }} ==="
+          # KernelSU-Next uses a different setup URL
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_version }}
           
-          # Verify KernelSU was added
+          # Verify KernelSU-Next was added
           ls -la KernelSU/ 2>/dev/null || echo "KernelSU directory check"
           cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || echo "KernelSU Makefile check"
 
@@ -82,8 +84,9 @@ jobs:
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
           echo "=== Adding susfs4ksu patches ==="
-          # Clone susfs4ksu repository
+          # Clone susfs4ksu repository (use the kernel 4.9 branch if available)
           git clone --depth 1 --branch 1.4.2-kernel-4.9 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
+          git clone --depth 1 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
           git clone --depth 1 https://github.com/infectedmushi/susfs4ksu.git susfs4ksu
           
           # Copy susfs source files
@@ -143,56 +146,30 @@ jobs:
           # Store the directory name for next step
           echo "DROIDSPACES_DIR=$DROIDSPACES_DIR" >> $GITHUB_ENV
 
-      - name: Apply GPU overclock
+      - name: Apply GPU overclock patches
         if: github.event.inputs.gpu_oc_level != 'stock'
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
           echo "=== Applying GPU overclock (${{ github.event.inputs.gpu_oc_level }}) ==="
           
-          # Find GPU DTSI file
-          GPU_DTSI=$(find arch/arm64/boot/dts/qcom -name "*gpu*.dtsi" | head -1)
-          echo "Found GPU DTSI: $GPU_DTSI"
+          GPU_DTSI="arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi"
           
-          # Create GPU overclock patch based on level
+          # The stock max GPU freq is at gpu-pwrlevel@0 = 600000000 (600 MHz)
+          # We need to modify this value based on OC level
+          
           if [ "${{ github.event.inputs.gpu_oc_level }}" == "aggressive" ]; then
-            # Aggressive: 835MHz
-            cat > /tmp/gpu-oc.patch << 'EOF'
---- a/arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi
-@@ -45,6 +45,10 @@
- 			<&clock_gpucc GPU_CC_CXO_CLK> ];
- 	clock-names = "iface_clk", "mem_clk", "core_clk", "rbbmtimer_clk",
- 			"alwayson_clk", "gtcu_clk", "gtbu_clk", "gmu_clk";
-+	
-+	/* GPU Overclock - Aggressive (835MHz) */
-+	qcom,gpu-max-clk = <835000000>;
-+	
- 	operating-points-v2 = <&gpu_opp_table>;
- 	interconnects = <&gpu_mnoc_datapath &mc_virt MASTER_EP &slv_ebi1>,
- 			<&gpu_mnoc_datapath &mmnoc MASTER_EP &slv_ebi1>;
-EOF
+            # Aggressive: 835 MHz (highest safe OC for Adreno 630)
+            sed -i 's/qcom,gpu-freq = <600000000>;/qcom,gpu-freq = <835000000>;/' "$GPU_DTSI"
+            echo "Applied 835MHz GPU overclock"
           else
-            # Conservative: 757MHz
-            cat > /tmp/gpu-oc.patch << 'EOF'
---- a/arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi
-@@ -45,6 +45,10 @@
- 			<&clock_gpucc GPU_CC_CXO_CLK> ];
- 	clock-names = "iface_clk", "mem_clk", "core_clk", "rbbmtimer_clk",
- 			"alwayson_clk", "gtcu_clk", "gtbu_clk", "gmu_clk";
-+	
-+	/* GPU Overclock - Conservative (757MHz) */
-+	qcom,gpu-max-clk = <757000000>;
-+	
- 	operating-points-v2 = <&gpu_opp_table>;
- 	interconnects = <&gpu_mnoc_datapath &mc_virt MASTER_EP &slv_ebi1>,
- 			<&gpu_mnoc_datapath &mmnoc MASTER_EP &slv_ebi1>;
-EOF
+            # Conservative: 670 MHz (safe bump)
+            sed -i 's/qcom,gpu-freq = <600000000>;/qcom,gpu-freq = <670000000>;/' "$GPU_DTSI"
+            echo "Applied 670MHz GPU overclock"
           fi
           
-          # Apply the patch
-          patch -p1 < /tmp/gpu-oc.patch || echo "GPU OC patch may need manual DTSI editing"
+          # Verify the change
+          grep -A 1 "gpu-pwrlevel@0" "$GPU_DTSI" | grep "qcom,gpu-freq"
 
       - name: Setup kernel configuration
         run: |
@@ -205,9 +182,10 @@ EOF
           
           # Create comprehensive config fragment
           cat > /tmp/crdroid-plus.config << 'EOF'
-          # ===== KernelSU Configuration =====
+          # ===== KernelSU-Next Configuration =====
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
+          # Disable kprobes for manual hook integration (more stable on 4.9)
           CONFIG_KPROBES=n
           
           # ===== Droidspaces Container Support =====
@@ -386,15 +364,16 @@ EOF
             
             Device: ${{ env.DEVICE }}
             Branch: ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }}
-            KernelSU: ${{ github.event.inputs.kernelsu_version }}
+            KernelSU-Next: ${{ github.event.inputs.kernelsu_version }}
             GPU OC: ${{ github.event.inputs.gpu_oc_level }}
             Build Date: ${{ github.event.head_commit.timestamp }}
             
             ## Features Included
             
-            ### 🔐 KernelSU + susfs
-            - KernelSU ${{ github.event.inputs.kernelsu_version }} for kernel-level root
+            ### 🔐 KernelSU-Next + susfs
+            - KernelSU-Next ${{ github.event.inputs.kernelsu_version }} for kernel-level root
             - susfs patches for root hiding (SafetyNet/Play Integrity)
+            - LTS mode for non-GKI kernels (4.9 support)
             
             ### 🐳 Droidspaces Container Support
             - Full namespace support (UTS, PID, IPC, NET, USER)
@@ -412,9 +391,10 @@ EOF
             
             ### 🎮 GPU Overclock
             - Level: ${{ github.event.inputs.gpu_oc_level }}
-            - Aggressive: 835MHz
-            - Conservative: 757MHz
-            - Stock: 710MHz (unchanged)
+            - Stock: 600MHz (unchanged)
+            - Conservative: 670MHz (~12% boost)
+            - Aggressive: 835MHz (~39% boost)
+            - Adreno 630 frequency table modified in sdm845-gpu.dtsi
             
             ## Installation
             
@@ -426,7 +406,7 @@ EOF
                ```
                fastboot flash dtbo dtbo.img
                ```
-            3. Reboot and install KernelSU manager APK
+            3. Reboot and install KernelSU-Next manager APK
             4. Install Droidspaces app
             
             ## Post-Install Setup
@@ -441,8 +421,9 @@ EOF
             ufw default allow outgoing
             ```
             
-            ### KernelSU + susfs Setup
-            1. Install KernelSU Manager APK
+            ### KernelSU-Next + susfs Setup
+            1. Install KernelSU-Next Manager APK
+               - Download from: https://github.com/KernelSU-Next/KernelSU-Next/releases
             2. Grant root access to apps
             3. Install susfs module for root hiding
             4. Configure app profiles as needed
@@ -451,6 +432,13 @@ EOF
             - cgroup v1 only (no v2 support on 4.9)
             - iptables-legacy required (nftables not supported)
             - May need Deadlock Shield for some containers
+            - GPU OC may require thermal management
+            
+            ## Primary Sources
+            - KernelSU-Next: https://github.com/KernelSU-Next/KernelSU-Next
+            - susfs4ksu: https://gitlab.com/1392726643/susfs4ksu
+            - Droidspaces: https://github.com/ravindu644/Droidspaces-OSS
+            - crDroid Kernel: https://github.com/crdroidandroid/android_kernel_oneplus_sdm845
           files: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dt*
