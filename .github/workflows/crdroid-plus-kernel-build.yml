@@ -97,12 +97,18 @@ jobs:
           
           # CRITICAL FIX: The setup.sh creates KernelSU-Next and symlinks drivers/kernelsu -> KernelSU-Next/kernel
           # If we manually cloned to KernelSU, we need to update the symlink to point to the right place
+          echo "=== Setting up KernelSU symlink ==="
           if [ -d "KernelSU" ] && [ -L "drivers/kernelsu" ]; then
             echo "Fixing kernelsu symlink to point to KernelSU/kernel..."
             rm -f drivers/kernelsu
             ln -sf "$(realpath --relative-to="drivers" "KernelSU/kernel")" drivers/kernelsu
             echo "Symlink updated: drivers/kernelsu -> $(readlink drivers/kernelsu)"
           fi
+          
+          # CRITICAL FIX v26: Ensure symlink points to the correct location BEFORE determining KSU_KERNEL_DIR
+          # The order matters - we must update the symlink first, then read its target
+          echo "=== Verifying KernelSU symlink ==="
+          ls -la drivers/kernelsu 2>/dev/null || echo "drivers/kernelsu not found"
           
           # Determine which kernel directory to patch
           # Priority: drivers/kernelsu (what's actually being compiled) -> KernelSU-Next/kernel -> KernelSU/kernel
@@ -249,11 +255,16 @@ jobs:
             fi
           fi
           
+          # CRITICAL FIX v26: Force-fix any remaining 'flags' issues after pre-patch
+          # This handles order-of-operations issues where the pre-patch might not apply correctly
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v26 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" "$KSU_KERNEL_DIR" || true
           # CRITICAL FIX v25: Complete fix for KernelSU-Next v1.0.7 kernel 4.9 compatibility
           # Fixes actual v1.0.7 code structure: ksu_umount_mnt(struct path *path, int flags)
-          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" ]; then
+          elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v25 (Python) ==="
-            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR"
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR" || true
           # CRITICAL FIX v24: Fixed 'flags' undeclared error for KernelSU-Next v1.0.7
           # Fixes line 591: ksu_umount_mnt(&path, flags) -> ksu_umount_mnt(&path, 0)
           elif [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v24.py" ]; then
