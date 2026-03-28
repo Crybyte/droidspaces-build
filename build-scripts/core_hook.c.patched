@@ -561,8 +561,7 @@ static bool should_umount(struct path *path)
 	return false;
 }
 
-static int ksu_umount_mnt(struct path *path, int flags)
-static int ksu_umount_mnt(struct path *path, int flags)
+static int ksu_umount_mnt(struct path *path)
 {
 	// Kernel 4.9 compatible implementation
 	// path_umount doesn't exist in kernel 4.9, use umount with path string
@@ -586,7 +585,8 @@ static int ksu_umount_mnt(struct path *path, int flags)
 	kfree(buf);
 	return err;
 }
-static void try_umount(const char *mnt, bool check_mnt, int flags)
+
+static void try_umount(const char *mnt, bool check_mnt)
 {
 	struct path path;
 	int err = kern_path(mnt, 0, &path);
@@ -604,7 +604,7 @@ static void try_umount(const char *mnt, bool check_mnt, int flags)
 		return;
 	}
 
-	err = ksu_umount_mnt(&path, flags);
+	err = ksu_umount_mnt(&path);
 	if (err) {
 		pr_warn("umount %s failed: %d\n", mnt, err);
 	}
@@ -664,23 +664,17 @@ int ksu_handle_setuid(struct cred *new, const struct cred *old)
 
 	// fixme: use `collect_mounts` and `iterate_mount` to iterate all mountpoint and
 	// filter the mountpoint whose target is `/data/adb`
-	try_umount("/odm", true, 0);
-	try_umount("/system", true, 0);
-	try_umount("/system_ext", true, 0);
-	try_umount("/vendor", true, 0);
-	try_umount("/product", true, 0);
-	try_umount("/data/adb/modules", false, MNT_DETACH);
-
-	// try umount ksu temp path
-	try_umount("/debug_ramdisk", false, MNT_DETACH);
-	try_umount("/sbin", false, MNT_DETACH);
-	
-	// try umount hosts file
-	try_umount("/system/etc/hosts", false, MNT_DETACH);
-
-	// try umount lsposed dex2oat bins
-	try_umount("/apex/com.android.art/bin/dex2oat64", false, MNT_DETACH);
-	try_umount("/apex/com.android.art/bin/dex2oat32", false, MNT_DETACH);
+	try_umount("/odm", true);
+	try_umount("/system", true);
+	try_umount("/system_ext", true);
+	try_umount("/vendor", true);
+	try_umount("/product", true);
+	try_umount("/data/adb/modules", false);
+	try_umount("/debug_ramdisk", false);
+	try_umount("/sbin", false);
+	try_umount("/system/etc/hosts", false);
+	try_umount("/apex/com.android.art/bin/dex2oat64", false);
+	try_umount("/apex/com.android.art/bin/dex2oat32", false);
 
 	return 0;
 }
