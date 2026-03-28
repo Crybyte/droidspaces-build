@@ -231,7 +231,23 @@ jobs:
           
           # Run external fix script for kernel 4.9 compatibility
           # This handles the try_umount function DEFINITION (not just calls)
-          if [ -f "build-scripts/fix-kernelsu-49-v12.sh" ]; then
+          if [ -f "build-scripts/core_hook.c.patched" ]; then
+            echo "=== Applying pre-patched core_hook.c for kernel 4.9 compatibility ==="
+            KSU_CORE_HOOK="$KSU_KERNEL_DIR/core_hook.c"
+            if [ -f "$KSU_CORE_HOOK" ]; then
+              cp "$KSU_CORE_HOOK" "${KSU_CORE_HOOK}.orig"
+              cp build-scripts/core_hook.c.patched "$KSU_CORE_HOOK"
+              echo "SUCCESS: Replaced core_hook.c with kernel 4.9 compatible version"
+              # Verify the patch
+              if grep -q "kmalloc(PATH_MAX" "$KSU_CORE_HOOK"; then
+                echo "VERIFIED: core_hook.c contains kernel 4.9 compatible code"
+              else
+                echo "WARNING: core_hook.c may not be properly patched"
+              fi
+            else
+              echo "WARNING: core_hook.c not found at $KSU_CORE_HOOK"
+            fi
+          elif [ -f "build-scripts/fix-kernelsu-49-v12.sh" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v12 ==="
             chmod +x build-scripts/fix-kernelsu-49-v12.sh
             KSU_DIR="$KSU_KERNEL_DIR" build-scripts/fix-kernelsu-49-v12.sh "$KSU_KERNEL_DIR"
