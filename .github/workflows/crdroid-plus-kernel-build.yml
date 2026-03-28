@@ -190,68 +190,20 @@ jobs:
           ls -la drivers/kernelsu 2>/dev/null || echo "drivers/kernelsu not found"
           echo "Symlink points to: $(readlink -f drivers/kernelsu 2>/dev/null || echo 'N/A')"
 
-      - name: Add susfs patches (v1.5.5 for kernel 4.9)
+      - name: Add susfs patches (DISABLED - causing build failures)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
-          echo "=== Adding susfs4ksu v1.5.5 patches ==="
-          # crDroid++ uses susfs v1.5.5 for kernel 4.9
-          # Try GitLab first (official repo), fallback to GitHub mirror
-          git clone --depth 1 --branch 1.5.5 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
-          git clone --depth 1 --branch 1.4.2-kernel-4.9 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
-          git clone --depth 1 https://github.com/infectedmushi/susfs4ksu.git susfs4ksu
+          echo "=== SKIPPING susfs4ksu patches - causing kernel 4.9 compatibility issues ==="
+          echo "Issue: susfs patches reference android_kabi_reserved fields that don't exist in kernel 4.9"
+          echo "KernelSU-Next works without susfs - continuing with build..."
+          echo ""
+          echo "NOTE: susfs is optional for SafetyNet/Play Integrity hiding."
+          echo "The kernel will work fine without it."
           
-          # Copy susfs source files
-          cp susfs4ksu/kernel_patches/fs/susfs.c fs/ 2>/dev/null || echo "susfs.c copy check"
-          cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/ 2>/dev/null || echo "susfs.h copy check"
-          
-          # Apply KernelSU susfs patch (only if KernelSU directory exists)
-          if [ -d "KernelSU" ] && [ -f "susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ]; then
-            echo "Applying KernelSU susfs patch..."
-            cd KernelSU
-            patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || \
-            echo "KernelSU susfs patch may already be applied or needs manual check"
-            cd ..
-          else
-            echo "KernelSU directory not found or patch missing - skipping KSU susfs patch"
-            echo "This is OK if KernelSU-Next will be set up later or uses a different structure"
-          fi
-          
-          # Apply kernel susfs patch (find the right version for 4.9)
-          SUSFS_PATCH=$(find susfs4ksu/kernel_patches -name "50_add_susfs_in_kernel*.patch" | grep -E "(4\.9|4\\.9)" | head -1)
-          if [ -z "$SUSFS_PATCH" ]; then
-            SUSFS_PATCH=$(find susfs4ksu/kernel_patches -name "50_add_susfs_in_kernel*.patch" | head -1)
-          fi
-          
-          if [ -n "$SUSFS_PATCH" ]; then
-            echo "Applying susfs patch: $SUSFS_PATCH"
-            # Apply patch but don't fail build if patches don't apply cleanly
-            # (may already be applied or source has diverged)
-            patch -p1 < "$SUSFS_PATCH" || {
-              echo "WARNING: susfs patch had some failures - checking if critical parts applied..."
-              # Check if susfs files were created (means partial success)
-              if [ -f "fs/susfs.c" ] && [ -f "include/linux/susfs.h" ]; then
-                echo "susfs source files exist - continuing with build"
-              else
-                echo "susfs source files missing - will try manual copy"
-                cp susfs4ksu/kernel_patches/fs/susfs.c fs/ 2>/dev/null || true
-                cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/ 2>/dev/null || true
-              fi
-            }
-          else
-            echo "No susfs kernel patch found - will try manual integration"
-          fi
-          
-          # Always ensure susfs files are present (fallback)
-          if [ ! -f "fs/susfs.c" ] || [ ! -f "include/linux/susfs.h" ]; then
-            echo "Ensuring susfs files are present..."
-            cp susfs4ksu/kernel_patches/fs/susfs.c fs/ 2>/dev/null || true
-            cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/ 2>/dev/null || true
-          fi
-          
-          # Store susfs info
-          echo "SUSFS_PATCH=$SUSFS_PATCH" >> $GITHUB_ENV
+          # Mark susfs as skipped
+          echo "SUSFS_SKIP=1" >> $GITHUB_ENV
 
       - name: Download and apply Droidspaces patches
         run: |
@@ -340,8 +292,8 @@ jobs:
           # Disable kprobes for manual hook integration (more stable on 4.9)
           CONFIG_KPROBES=n
           
-          # ===== susfs (if not using KSU v3.0.0) =====
-          CONFIG_KSU_SUSFS=y
+          # ===== susfs (DISABLED - causing kernel 4.9 compatibility issues) =====
+          # CONFIG_KSU_SUSFS is not set
           
           # ===== Droidspaces Container Support =====
           CONFIG_NAMESPACES=y
