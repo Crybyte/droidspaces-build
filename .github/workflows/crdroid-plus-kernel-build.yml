@@ -74,7 +74,12 @@ jobs:
           # KernelSU-Next setup from the 'next' branch (crDroid++ uses this)
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_version }}
           
-          # Verify KernelSU-Next was added
+          # Verify KernelSU-Next was added - if not, manually clone it
+          if [ ! -d "KernelSU" ]; then
+            echo "KernelSU directory not created by setup script, cloning manually..."
+            git clone --depth 1 --branch next https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU
+          fi
+          
           ls -la KernelSU/ 2>/dev/null || echo "KernelSU directory check"
           cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || echo "KernelSU Makefile check"
 
@@ -94,12 +99,16 @@ jobs:
           cp susfs4ksu/kernel_patches/fs/susfs.c fs/ 2>/dev/null || echo "susfs.c copy check"
           cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/ 2>/dev/null || echo "susfs.h copy check"
           
-          # Apply KernelSU susfs patch
-          if [ -f "susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ]; then
+          # Apply KernelSU susfs patch (only if KernelSU directory exists)
+          if [ -d "KernelSU" ] && [ -f "susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ]; then
+            echo "Applying KernelSU susfs patch..."
             cd KernelSU
             patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || \
             echo "KernelSU susfs patch may already be applied or needs manual check"
             cd ..
+          else
+            echo "KernelSU directory not found or patch missing - skipping KSU susfs patch"
+            echo "This is OK if KernelSU-Next will be set up later or uses a different structure"
           fi
           
           # Apply kernel susfs patch (find the right version for 4.9)
