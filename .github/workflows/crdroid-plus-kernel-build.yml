@@ -1,4 +1,4 @@
-name: crDroid++ Kernel Build (Droidspaces + KernelSU-Next + susfs + GPU OC + UFW)
+name: crDroid++ Kernel Build (Droidspaces + KSU-Next + susfs + GPU OC + UFW)
 
 on:
   workflow_dispatch:
@@ -11,21 +11,20 @@ on:
       kernelsu_version:
         description: 'KernelSU-Next version'
         required: true
-        default: 'v1.0.5'
+        default: 'v1.0.7'
         type: choice
         options:
-          - v1.0.5
-          - v1.0.4
-          - v1.0.3
+          - v1.0.7
+          - v1.0.6
+          - v3.0.0
       gpu_oc_level:
-        description: 'GPU overclock level'
+        description: 'GPU overclock level (crDroid++ uses 812MHz)'
         required: true
         default: 'stock'
         type: choice
         options:
           - stock
-          - conservative
-          - aggressive
+          - crdroid++
       build_type:
         description: 'Build type'
         required: true
@@ -72,21 +71,23 @@ jobs:
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
           echo "=== Adding KernelSU-Next ${{ github.event.inputs.kernelsu_version }} ==="
-          # KernelSU-Next uses a different setup URL
+          # KernelSU-Next setup from the 'next' branch (crDroid++ uses this)
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_version }}
           
           # Verify KernelSU-Next was added
           ls -la KernelSU/ 2>/dev/null || echo "KernelSU directory check"
           cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || echo "KernelSU Makefile check"
 
-      - name: Add susfs patches
+      - name: Add susfs patches (v1.5.5 for kernel 4.9)
+        if: github.event.inputs.kernelsu_version != 'v3.0.0'
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
-          echo "=== Adding susfs4ksu patches ==="
-          # Clone susfs4ksu repository (use the kernel 4.9 branch if available)
+          echo "=== Adding susfs4ksu v1.5.5 patches ==="
+          # crDroid++ uses susfs v1.5.5 for kernel 4.9
+          # Try GitLab first (official repo), fallback to GitHub mirror
+          git clone --depth 1 --branch 1.5.5 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
           git clone --depth 1 --branch 1.4.2-kernel-4.9 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
-          git clone --depth 1 https://gitlab.com/1392726643/susfs4ksu.git susfs4ksu 2>/dev/null || \
           git clone --depth 1 https://github.com/infectedmushi/susfs4ksu.git susfs4ksu
           
           # Copy susfs source files
@@ -101,7 +102,7 @@ jobs:
             cd ..
           fi
           
-          # Apply kernel susfs patch (find the right version)
+          # Apply kernel susfs patch (find the right version for 4.9)
           SUSFS_PATCH=$(find susfs4ksu/kernel_patches -name "50_add_susfs_in_kernel*.patch" | grep -E "(4\.9|4\\.9)" | head -1)
           if [ -z "$SUSFS_PATCH" ]; then
             SUSFS_PATCH=$(find susfs4ksu/kernel_patches -name "50_add_susfs_in_kernel*.patch" | head -1)
@@ -111,7 +112,7 @@ jobs:
             echo "Applying susfs patch: $SUSFS_PATCH"
             patch -p1 < "$SUSFS_PATCH" || echo "susfs kernel patch may need manual adjustment"
           else
-            echo "No susfs kernel patch found, may need manual integration"
+            echo "No susfs kernel patch found - will try manual integration"
           fi
           
           # Store susfs info
@@ -146,30 +147,24 @@ jobs:
           # Store the directory name for next step
           echo "DROIDSPACES_DIR=$DROIDSPACES_DIR" >> $GITHUB_ENV
 
-      - name: Apply GPU overclock patches
-        if: github.event.inputs.gpu_oc_level != 'stock'
+      - name: Apply crDroid++ GPU overclock patch
+        if: github.event.inputs.gpu_oc_level == 'crdroid++'
         run: |
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
-          echo "=== Applying GPU overclock (${{ github.event.inputs.gpu_oc_level }}) ==="
+          echo "=== Applying crDroid++ GPU overclock (812MHz) ==="
           
           GPU_DTSI="arch/arm64/boot/dts/qcom/sdm845-gpu.dtsi"
           
-          # The stock max GPU freq is at gpu-pwrlevel@0 = 600000000 (600 MHz)
-          # We need to modify this value based on OC level
-          
-          if [ "${{ github.event.inputs.gpu_oc_level }}" == "aggressive" ]; then
-            # Aggressive: 835 MHz (highest safe OC for Adreno 630)
-            sed -i 's/qcom,gpu-freq = <600000000>;/qcom,gpu-freq = <835000000>;/' "$GPU_DTSI"
-            echo "Applied 835MHz GPU overclock"
-          else
-            # Conservative: 670 MHz (safe bump)
-            sed -i 's/qcom,gpu-freq = <600000000>;/qcom,gpu-freq = <670000000>;/' "$GPU_DTSI"
-            echo "Applied 670MHz GPU overclock"
-          fi
+          # crDroid++ uses 812MHz max GPU freq (stock is 600MHz)
+          # This matches the TJ-Releases/crDroidPlusPlus_kernel specification
+          sed -i 's/qcom,gpu-freq = <600000000>;/qcom,gpu-freq = <812000000>;/' "$GPU_DTSI"
           
           # Verify the change
+          echo "Verifying GPU OC patch:"
           grep -A 1 "gpu-pwrlevel@0" "$GPU_DTSI" | grep "qcom,gpu-freq"
+          
+          echo "GPU overclock applied: 600MHz -> 812MHz"
 
       - name: Setup kernel configuration
         run: |
@@ -180,13 +175,15 @@ jobs:
           # Start with enchilada defconfig
           make O=out ARCH=arm64 enchilada_defconfig
           
-          # Create comprehensive config fragment
+          # Create comprehensive config fragment (crDroid++ style)
           cat > /tmp/crdroid-plus.config << 'EOF'
           # ===== KernelSU-Next Configuration =====
           CONFIG_KSU=y
-          CONFIG_KSU_SUSFS=y
           # Disable kprobes for manual hook integration (more stable on 4.9)
           CONFIG_KPROBES=n
+          
+          # ===== susfs (if not using KSU v3.0.0) =====
+          CONFIG_KSU_SUSFS=y
           
           # ===== Droidspaces Container Support =====
           CONFIG_NAMESPACES=y
@@ -257,8 +254,10 @@ jobs:
           # ===== Additional Network Security =====
           CONFIG_SYN_COOKIES=y
           
-          # ===== Debugging (for development) =====
-          # CONFIG_DYNAMIC_DEBUG is not set
+          # ===== Extra TCP congestion algorithms (crDroid++ style) =====
+          CONFIG_TCP_CONG_ADVANCED=y
+          CONFIG_TCP_CONG_BBR=y
+          CONFIG_DEFAULT_TCP_CONG=cubic
           EOF
           
           # Apply config fragment
@@ -336,7 +335,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: crdroid-plus-kernel-${{ env.DEVICE }}-${{ github.run_number }}
+          name: crdroid-plus-kernel-${{ env.DEVICE }}-${{ github.run_number }}${{ github.event.inputs.gpu_oc_level == 'crdroid++' && '-OCGPU' || '' }}
           path: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
@@ -357,23 +356,23 @@ jobs:
         if: github.event.inputs.build_type == 'release' && success()
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: crdroid-plus-${{ env.DEVICE }}-${{ github.run_number }}
-          name: "crDroid++ Kernel ${{ env.DEVICE }} - Build #${{ github.run_number }}"
+          tag_name: crdroid-plus-${{ env.DEVICE }}-${{ github.run_number }}${{ github.event.inputs.gpu_oc_level == 'crdroid++' && '-OCGPU' || '' }}
+          name: "crDroid++ Kernel ${{ env.DEVICE }} - Build #${{ github.run_number }}${{ github.event.inputs.gpu_oc_level == 'crdroid++' && ' [OCGPU]' || '' }}"
           body: |
-            **crDroid++ Kernel with Full Feature Set**
+            **crDroid++ Style Kernel with Full Feature Set**
             
             Device: ${{ env.DEVICE }}
             Branch: ${{ github.event.inputs.crdroid_branch || env.ANDROID_VERSION }}
             KernelSU-Next: ${{ github.event.inputs.kernelsu_version }}
-            GPU OC: ${{ github.event.inputs.gpu_oc_level }}
+            GPU: ${{ github.event.inputs.gpu_oc_level == 'crdroid++' && '812MHz OC (crDroid++)' || 'Stock 600MHz' }}
             Build Date: ${{ github.event.head_commit.timestamp }}
             
             ## Features Included
             
-            ### 🔐 KernelSU-Next + susfs
+            ### 🔐 KernelSU-Next + susfs (crDroid++ style)
             - KernelSU-Next ${{ github.event.inputs.kernelsu_version }} for kernel-level root
-            - susfs patches for root hiding (SafetyNet/Play Integrity)
-            - LTS mode for non-GKI kernels (4.9 support)
+            ${{ github.event.inputs.kernelsu_version != 'v3.0.0' && '- susfs v1.5.5 driver for root hiding (SafetyNet/Play Integrity)' || '- No susfs (KSU v3.0.0 does not support it)' }}
+            - Manual hooks (kprobes disabled for stability)
             
             ### 🐳 Droidspaces Container Support
             - Full namespace support (UTS, PID, IPC, NET, USER)
@@ -389,12 +388,12 @@ jobs:
             - Full IPv6 iptables support
             - Connection tracking helpers
             
-            ### 🎮 GPU Overclock
-            - Level: ${{ github.event.inputs.gpu_oc_level }}
-            - Stock: 600MHz (unchanged)
-            - Conservative: 670MHz (~12% boost)
-            - Aggressive: 835MHz (~39% boost)
-            - Adreno 630 frequency table modified in sdm845-gpu.dtsi
+            ### 🎮 GPU Overclock (crDroid++ Spec)
+            ${{ github.event.inputs.gpu_oc_level == 'crdroid++' && '- **812MHz** max frequency (vs stock 600MHz)' || '- Stock 600MHz' }}
+            ${{ github.event.inputs.gpu_oc_level == 'crdroid++' && '- ~35% GPU performance boost' || '- Standard Adreno 630 frequencies' }}
+            
+            ### 🌐 Extra TCP Congestion Algorithms
+            - BBR, Cubic, and more (crDroid++ style)
             
             ## Installation
             
@@ -406,10 +405,14 @@ jobs:
                ```
                fastboot flash dtbo dtbo.img
                ```
-            3. Reboot and install KernelSU-Next manager APK
+            3. Reboot and install KernelSU-Next Manager APK
             4. Install Droidspaces app
             
             ## Post-Install Setup
+            
+            ### KernelSU-Next Manager
+            Download the manager APK that matches your kernel version:
+            ${{ github.event.inputs.kernelsu_version == 'v1.0.7' && '- [KernelSU-Next v1.0.7 Manager](https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.0.7/KernelSU_Next_v1.0.7_12602-release.apk)' || '- [KernelSU-Next Releases](https://github.com/KernelSU-Next/KernelSU-Next/releases)' }}
             
             ### Enable UFW in Droidspaces Container
             ```bash
@@ -421,24 +424,19 @@ jobs:
             ufw default allow outgoing
             ```
             
-            ### KernelSU-Next + susfs Setup
-            1. Install KernelSU-Next Manager APK
-               - Download from: https://github.com/KernelSU-Next/KernelSU-Next/releases
-            2. Grant root access to apps
-            3. Install susfs module for root hiding
-            4. Configure app profiles as needed
+            ## Primary Sources
+            - **crDroid++ Kernel Releases:** https://github.com/TJ-Releases/crDroidPlusPlus_kernel
+            - **Terminator-J Kernel Source:** https://github.com/Terminator-J/crdroid_kernel_oneplus_sdm845
+            - **KernelSU-Next:** https://github.com/KernelSU-Next/KernelSU-Next
+            - **susfs4ksu:** https://gitlab.com/1392726643/susfs4ksu
+            - **Droidspaces:** https://github.com/ravindu644/Droidspaces-OSS
+            - **crDroid:** https://github.com/crdroidandroid/android_kernel_oneplus_sdm845
             
             ## Known Limitations
             - cgroup v1 only (no v2 support on 4.9)
             - iptables-legacy required (nftables not supported)
             - May need Deadlock Shield for some containers
-            - GPU OC may require thermal management
-            
-            ## Primary Sources
-            - KernelSU-Next: https://github.com/KernelSU-Next/KernelSU-Next
-            - susfs4ksu: https://gitlab.com/1392726643/susfs4ksu
-            - Droidspaces: https://github.com/ravindu644/Droidspaces-OSS
-            - crDroid Kernel: https://github.com/crdroidandroid/android_kernel_oneplus_sdm845
+            - GPU OC may cause instability on some devices (fajita reportedly has issues at 812MHz)
           files: |
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/Image.gz-dtb
             ~/kernel-build/android_kernel_oneplus_sdm845/out/arch/arm64/boot/dts/qcom/*enchilada*.dt*
