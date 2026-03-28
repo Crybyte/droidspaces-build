@@ -74,14 +74,22 @@ jobs:
           # KernelSU-Next setup from the 'next' branch (crDroid++ uses this)
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_version }}
           
-          # Verify KernelSU-Next was added - if not, manually clone it
-          if [ ! -d "KernelSU" ]; then
-            echo "KernelSU directory not created by setup script, cloning manually..."
-            git clone --depth 1 --branch next https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU
+          # Verify KernelSU-Next was added - check for symlink or directory
+          # The setup script creates a symlink 'KernelSU' -> 'KernelSU-Next'
+          if [ ! -e "KernelSU" ]; then
+            echo "KernelSU not created by setup script, cloning manually..."
+            # Remove any broken symlink if exists
+            rm -f KernelSU
+            # Clone using the version tag (not 'next' branch)
+            KSU_VERSION="${{ github.event.inputs.kernelsu_version }}"
+            git clone --depth 1 --branch "$KSU_VERSION" https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU
           fi
           
-          ls -la KernelSU/ 2>/dev/null || echo "KernelSU directory check"
-          cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || echo "KernelSU Makefile check"
+          # Verify it worked
+          echo "=== KernelSU directory check ==="
+          ls -la KernelSU/ 2>/dev/null || { echo "ERROR: KernelSU directory missing!"; exit 1; }
+          echo "=== KernelSU Makefile check ==="
+          cat KernelSU/kernel/Makefile 2>/dev/null | head -5 || { echo "ERROR: KernelSU Makefile missing!"; exit 1; }
 
       - name: Add susfs patches (v1.5.5 for kernel 4.9)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
