@@ -146,11 +146,13 @@ jobs:
           export ARCH=arm64
           export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
           # Build device tree for selected device
           make -j$(nproc) O=out ARCH=arm64 \
             CC="gcc -Wno-error=format -Wno-error=address -Wno-error=misleading-indentation -Wno-error=enum-int-mismatch -Wno-error=memset-elt-size -Wno-error=stringop-overread -Wno-error=duplicate-decl-specifier -Wno-error=array-parameter= -Wno-error=maybe-uninitialized" \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             dtbs \
             2>&1 | tee -a build.log
 
