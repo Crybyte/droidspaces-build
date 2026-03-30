@@ -161,11 +161,16 @@ jobs:
           cd ~/kernel-build/android_kernel_oneplus_sdm845
           
           # Find the correct DTB for the device
-          if [ "${{ env.DEVICE }}" = "fajita" ]; then
-            DTB_FILE="out/arch/arm64/boot/dts/qcom/sdm845-v2-fajita.dtb"
+          # SDM845 v2 is used for both enchilada (6) and fajita (6T)
+          if [ -f "out/arch/arm64/boot/dts/qcom/sdm845-v2.dtb" ]; then
+            DTB_FILE="out/arch/arm64/boot/dts/qcom/sdm845-v2.dtb"
+          elif [ -f "out/arch/arm64/boot/dts/qcom/sdm845-v2.1.dtb" ]; then
+            DTB_FILE="out/arch/arm64/boot/dts/qcom/sdm845-v2.1.dtb"
           else
-            DTB_FILE="out/arch/arm64/boot/dts/qcom/sdm845-v2-enchilada.dtb"
+            DTB_FILE="out/arch/arm64/boot/dts/qcom/sdm845.dtb"
           fi
+          
+          echo "Using DTB: ${DTB_FILE}"
           
           # Concatenate kernel + dtb for Image.gz-dtb
           cat out/arch/arm64/boot/Image.gz ${DTB_FILE} > out/arch/arm64/boot/Image.gz-dtb
