@@ -142,8 +142,11 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
           
+          # Workaround for clang being strict about includes
+          export KCFLAGS="-Wno-error=quoted-include-in-framework-header -Wno-quoted-include-in-framework-header"
+          
           # Use enchilada_defconfig for both devices (same base)
-          make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip enchilada_defconfig
+          make KCFLAGS="${KCFLAGS}" CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip enchilada_defconfig
           
           # Enable BBR (should already be enabled but ensure it)
           scripts/config --enable CONFIG_TCP_CONG_BBR
@@ -184,7 +187,7 @@ jobs:
           scripts/config --disable CONFIG_MSM_QDSP6V2_CODECS
           
           # Save config
-          make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip olddefconfig
+          make KCFLAGS="-Wno-error=quoted-include-in-framework-header -Wno-quoted-include-in-framework-header" CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip olddefconfig
           
           echo "Kernel configuration complete"
           grep CONFIG_TCP_CONG_BBR .config || echo "BBR not found in config!"
@@ -209,7 +212,8 @@ jobs:
           export KBUILD_BUILD_HOST="plus-plus"
           
           # Build with all cores - use LLVM tools explicitly
-          make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j$(nproc --all) 2>&1 | tee build.log
+          # KCFLAGS workaround for clang strict include checks
+          make KCFLAGS="-Wno-error=quoted-include-in-framework-header -Wno-quoted-include-in-framework-header" CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j$(nproc --all) 2>&1 | tee build.log
           
           if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
             echo "ERROR: Kernel build failed - Image.gz-dtb not found"
