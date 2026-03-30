@@ -186,6 +186,10 @@ jobs:
           scripts/config --disable CONFIG_SND_SOC_MSM_QDSP6V2_INTF
           scripts/config --disable CONFIG_MSM_QDSP6V2_CODECS
           
+          # Disable bluetooth drivers with include issues
+          scripts/config --disable CONFIG_BTFM_SLIM
+          scripts/config --disable CONFIG_MSM_BT_POWER
+          
           # Save config
           make KCFLAGS="-Wno-error=quoted-include-in-framework-header -Wno-quoted-include-in-framework-header" CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip olddefconfig
           
