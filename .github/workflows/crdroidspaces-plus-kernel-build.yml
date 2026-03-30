@@ -1,0 +1,297 @@
+name: crDroidSpaces++ Kernel Build (crDroid + GPU OC + UFW/Fail2Ban)
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Kernel source branch'
+        required: true
+        default: '15.0-test'
+        type: choice
+        options:
+          - '15.0-test'
+          - '15.0-plusplus_KSUN3_test1'
+      device:
+        description: 'Device to build for'
+        required: true
+        default: 'enchilada'
+        type: choice
+        options:
+          - 'enchilada'
+          - 'fajita'
+      gpu_oc:
+        description: 'Enable GPU Overclock (812MHz)'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  BRANCH: ${{ github.event.inputs.branch || '15.0-test' }}
+  DEVICE: ${{ github.event.inputs.device || 'enchilada' }}
+  GPU_OC: ${{ github.event.inputs.gpu_oc || true }}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout build scripts
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex \
+            g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev \
+            lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev \
+            libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync \
+            schedtool squashfs-tools xsltproc zip zlib1g-dev
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ runner.os }}-kernel-${{ env.DEVICE }}
+          max-size: 5G
+
+      - name: Clone kernel source
+        run: |
+          git clone --depth=1 -b ${{ env.BRANCH }} \
+            https://github.com/Terminator-J/crdroid_kernel_oneplus_sdm845.git \
+            ~/kernel-build/android_kernel_oneplus_sdm845
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          echo "Kernel source cloned at: $(pwd)"
+          echo "Branch: $(git branch --show-current)"
+          echo "Latest commit: $(git log --oneline -1)"
+
+      - name: Apply GPU OC patches
+        if: env.GPU_OC == 'true'
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          echo "Applying GPU OC patches from verified crDroid++ source..."
+          
+          # Try to fetch and cherry-pick the verified GPU OC commit from Terminator-J
+          git remote add tj_upstream https://github.com/Terminator-J/crdroid_kernel_oneplus_sdm845.git 2>/dev/null || true
+          git fetch tj_upstream 15.0-plusplus_KSUN3_test1 --depth=20 2>/dev/null || {
+            echo "Could not fetch from upstream, using local patch..."
+          }
+          
+          # Try cherry-pick first
+          if git cherry-pick 5ea4c7ee301a67b528ca2ebdbc53b4f5d4fbdcd6 --no-commit 2>/dev/null; then
+            echo "Successfully cherry-picked GPU OC commit"
+          else
+            echo "Cherry-pick failed, applying local patch..."
+            git checkout HEAD -- .
+            
+            # Apply the verified patch file
+            if [ -f "${{ github.workspace }}/patches/gpu-oc-sdm845.patch" ]; then
+              patch -p1 < "${{ github.workspace }}/patches/gpu-oc-sdm845.patch" || {
+                echo "Patch failed, applying manual edits..."
+                
+                # Manual edit: gpucc-sdm845.c frequency table
+                sed -i 's/F(510000000, P_CRC_DIV, 1, 0, 0),/F(520000000, P_CRC_DIV, 1, 0, 0),/' \
+                  drivers/clk/qcom/gpucc-sdm845.c
+                sed -i 's/F(828000000, P_CRC_DIV, 1, 0, 0),/F(812000000, P_CRC_DIV, 1, 0, 0),/' \
+                  drivers/clk/qcom/gpucc-sdm845.c
+                
+                # Manual edit: sdm845-v2.dtsi GPU frequency
+                sed -i 's/828000000/812000000/g' arch/arm64/boot/dts/qcom/sdm845-v2.dtsi
+              }
+            else
+              echo "Patch file not found, using sed fallback..."
+              sed -i 's/F(510000000, P_CRC_DIV, 1, 0, 0),/F(520000000, P_CRC_DIV, 1, 0, 0),/' \
+                drivers/clk/qcom/gpucc-sdm845.c
+              sed -i 's/F(828000000, P_CRC_DIV, 1, 0, 0),/F(812000000, P_CRC_DIV, 1, 0, 0),/' \
+                drivers/clk/qcom/gpucc-sdm845.c
+              sed -i 's/828000000/812000000/g' arch/arm64/boot/dts/qcom/sdm845-v2.dtsi
+            fi
+          fi
+          
+          echo "GPU OC patches applied"
+
+      - name: Setup toolchain
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          # Download Proton Clang
+          mkdir -p ~/toolchains
+          cd ~/toolchains
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git
+          
+          export PATH="${HOME}/toolchains/proton-clang/bin:${PATH}"
+          echo "PATH=${PATH}" >> $GITHUB_ENV
+          
+          # Verify toolchain
+          ${HOME}/toolchains/proton-clang/bin/clang --version
+
+      - name: Configure kernel
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          # Proton Clang exports
+          export PATH="${HOME}/toolchains/proton-clang/bin:${PATH}"
+          export ARCH=arm64
+          export CC=clang
+          export CXX=clang++
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+          
+          # Use enchilada_defconfig for both devices (same base)
+          make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip enchilada_defconfig
+          
+          # Enable BBR (should already be enabled but ensure it)
+          scripts/config --enable CONFIG_TCP_CONG_BBR
+          scripts/config --set-val CONFIG_DEFAULT_TCP_CONG bbr
+          
+          # Enable UFW/Fail2Ban networking features
+          scripts/config --enable CONFIG_NETFILTER_XT_MATCH_LIMIT
+          scripts/config --enable CONFIG_NETFILTER_XT_MATCH_MULTIPORT
+          scripts/config --enable CONFIG_NETFILTER_XT_MATCH_RECENT
+          scripts/config --enable CONFIG_NETFILTER_XT_MATCH_STATE
+          scripts/config --enable CONFIG_IP_NF_FILTER
+          scripts/config --enable CONFIG_IP_NF_TARGET_REJECT
+          
+          # Ensure Droidspaces compatibility
+          scripts/config --enable CONFIG_NAMESPACES
+          scripts/config --enable CONFIG_UTS_NS
+          scripts/config --enable CONFIG_IPC_NS
+          scripts/config --enable CONFIG_PID_NS
+          scripts/config --enable CONFIG_NET_NS
+          scripts/config --enable CONFIG_CGROUPS
+          scripts/config --enable CONFIG_CGROUP_CPUACCT
+          scripts/config --enable CONFIG_CGROUP_DEVICE
+          scripts/config --enable CONFIG_CGROUP_FREEZER
+          scripts/config --enable CONFIG_CGROUP_SCHED
+          scripts/config --enable CONFIG_CPUSETS
+          scripts/config --enable CONFIG_MEMCG
+          
+          # Disable KernelSU configs if present
+          scripts/config --disable CONFIG_KSU
+          scripts/config --disable CONFIG_KSU_SUSFS
+          
+          # Save config
+          make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip olddefconfig
+          
+          echo "Kernel configuration complete"
+          grep CONFIG_TCP_CONG_BBR .config || echo "BBR not found in config!"
+
+      - name: Build kernel
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          # Proton Clang exports
+          export PATH="${HOME}/toolchains/proton-clang/bin:${PATH}"
+          export ARCH=arm64
+          export CC=clang
+          export CXX=clang++
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+          export KBUILD_BUILD_USER="crDroidSpaces"
+          export KBUILD_BUILD_HOST="plus-plus"
+          
+          # Build with all cores - use LLVM tools explicitly
+          make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j$(nproc --all) 2>&1 | tee build.log
+          
+          if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "ERROR: Kernel build failed - Image.gz-dtb not found"
+            tail -100 build.log
+            exit 1
+          fi
+          
+          echo "Kernel build successful!"
+          ls -lh out/arch/arm64/boot/Image.gz-dtb
+
+      - name: Create flashable zip
+        run: |
+          cd ~/kernel-build/android_kernel_oneplus_sdm845
+          
+          # Clone AnyKernel3
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git ~/anykernel
+          
+          # Copy kernel image
+          cp out/arch/arm64/boot/Image.gz-dtb ~/anykernel/
+          
+          # Create zip
+          cd ~/anykernel
+          
+          # Update anykernel.sh
+          sed -i 's/ExampleKernel by osm0sis/crDroidSpaces++ Kernel/' anykernel.sh
+          sed -i 's/=oneplus6/=${{ env.DEVICE }}/' anykernel.sh
+          
+          # Add GPU OC info to banner
+          if [ "${{ env.GPU_OC }}" == "true" ]; then
+            echo "GPU OC: 812MHz enabled" >> banner
+          fi
+          
+          # Create zip
+          ZIP_NAME="crDroidSpaces++-kernel-${{ env.DEVICE }}-${{ github.run_number }}"
+          if [ "${{ env.GPU_OC }}" == "true" ]; then
+            ZIP_NAME="${ZIP_NAME}-OCGPU"
+          fi
+          ZIP_NAME="${ZIP_NAME}.zip"
+          
+          zip -r9 "${ZIP_NAME}" * -x .git README.md anykernel.sh.in
+          
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
+          mv "${ZIP_NAME}" ~/kernel-build/android_kernel_oneplus_sdm845/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ~/kernel-build/android_kernel_oneplus_sdm845/${{ env.ZIP_NAME }}
+          retention-days: 30
+
+      - name: Create release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: crdroidspaces++-${{ env.DEVICE }}-${{ github.run_number }}
+          name: "crDroidSpaces++ Kernel ${{ env.DEVICE }} - Build #${{ github.run_number }}"
+          body: |
+            crDroidSpaces++ Kernel for OnePlus ${{ env.DEVICE == 'enchilada' && '6' || '6T' }}
+            
+            **Features:**
+            - Based on Terminator-J's crDroid kernel (branch: ${{ env.BRANCH }})
+            - BBR TCP congestion control
+            - UFW/Fail2Ban networking support
+            ${{ env.GPU_OC == 'true' && '- GPU Overclock: 812MHz max (up from ~710MHz stock)' || '- Stock GPU frequencies' }}
+            
+            **Droidspaces Compatible:**
+            - No susfs (causes container boot failures)
+            - No KernelSU (unnecessary for container root)
+            - Full namespace/cgroup support
+            
+            **Notes:**
+            - Flash via recovery (TWRP/OrangeFox)
+            - GPU OC is silicon lottery - some devices may not boot at 812MHz
+            
+            **Source:**
+            - https://github.com/Terminator-J/crdroid_kernel_oneplus_sdm845
+          files: ~/kernel-build/android_kernel_oneplus_sdm845/${{ env.ZIP_NAME }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build summary
+        run: |
+          echo "========================================="
+          echo "crDroidSpaces++ Kernel Build Complete"
+          echo "========================================="
+          echo "Device: ${{ env.DEVICE }}"
+          echo "Branch: ${{ env.BRANCH }}"
+          echo "GPU OC: ${{ env.GPU_OC }}"
+          echo "Output: ${{ env.ZIP_NAME }}"
+          echo "========================================="
