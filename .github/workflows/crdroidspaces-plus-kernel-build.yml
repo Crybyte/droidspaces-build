@@ -228,11 +228,20 @@ jobs:
           path: ~/kernel-build/android_kernel_oneplus_sdm845/${{ env.ZIP_NAME }}
           retention-days: 30
 
+      - name: Generate release tag
+        id: release_tag
+        run: |
+          RELEASE_DATE=$(date +%Y%m%d)
+          RELEASE_DATE_HYPHEN=$(date +%Y-%m-%d)
+          echo "tag_name=crdroidspaces++-${{ env.DEVICE }}-${RELEASE_DATE}" >> $GITHUB_OUTPUT
+          echo "release_name=crDroidSpaces++ Kernel ${{ env.DEVICE }} - ${RELEASE_DATE_HYPHEN}" >> $GITHUB_OUTPUT
+          echo "Generated tag: crdroidspaces++-${{ env.DEVICE }}-${RELEASE_DATE}"
+
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: crdroidspaces++-${{ env.DEVICE }}-$(date +%Y%m%d)
-          name: "crDroidSpaces++ Kernel ${{ env.DEVICE }} - $(date +%Y-%m-%d)"
+          tag_name: ${{ steps.release_tag.outputs.tag_name }}
+          name: "${{ steps.release_tag.outputs.release_name }}"
           body: |
             crDroidSpaces++ Kernel for OnePlus ${{ env.DEVICE == 'enchilada' && '6' || '6T' }}
             
