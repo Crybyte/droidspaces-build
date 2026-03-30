@@ -175,6 +175,14 @@ jobs:
           scripts/config --disable CONFIG_KSU
           scripts/config --disable CONFIG_KSU_SUSFS
           
+          # Disable techpack audio (causes clang include issues)
+          scripts/config --disable CONFIG_MSM_QDSP6_APRV2_GLINK
+          scripts/config --disable CONFIG_MSM_QDSP6_SSR
+          scripts/config --disable CONFIG_MSM_ADSP_LOADER
+          scripts/config --disable CONFIG_MSM_QDSP6_NOTIFIER
+          scripts/config --disable CONFIG_SND_SOC_MSM_QDSP6V2_INTF
+          scripts/config --disable CONFIG_MSM_QDSP6V2_CODECS
+          
           # Save config
           make CC=clang CXX=clang++ AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip olddefconfig
           
