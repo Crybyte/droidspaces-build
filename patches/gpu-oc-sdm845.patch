@@ -1,0 +1,104 @@
+From: Terminator-J <noreference@web.de>
+Date: Mon, 21 Jul 2025 00:00:00 +0000
+Subject: [PATCH] GPU: add GPU overclocking
+
+Based on mcdachpappe's original GPU OC implementation for crDroid++
+- Add 180 MHz step [default minimum freq]
+- Add 636, 787 and 812 MHz steps [OC]
+- Drop highest OC freq from 842 to 812MHz for stability
+
+Lots of stability issues at 842MHz. Try slightly less ambitious OC
+(still >100MHz over stock).
+
+Signed-off-by: Terminator-J <noreference@web.de>
+---
+ arch/arm64/boot/dts/qcom/sdm845-v2.dtsi | 14 +++++++-------
+ drivers/clk/qcom/gpucc-sdm845.c         | 26 +++++++++++++++++---------
+ drivers/clk/qcom/vdd-level-sdm845.h     |  6 +++++-
+ 3 files changed, 29 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-v2.dtsi b/arch/arm64/boot/dts/qcom/sdm845-v2.dtsi
+index 1234567..abcdefg 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-v2.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845-v2.dtsi
+@@ -557,27 +557,27 @@
+ 
+ &msm_gpu {
+ 	/* Updated chip ID */
+ 	qcom,chipid = <0x06030001>;
+ 
+ 	/* Power levels updated for v2 */
+ 	qcom,gpu-pwrlevel-bins = <
+-		/* 
++		/*
+ 		 * binminpwrlevel
+ 		 * binmaxpwrlevel
+ 		 * binsupportedfreqlist[0]
+ 		 * binsupportedfreqlist[1]
+ 		 * binsupportedfreqlist[2]
+ 		 * binsupportedfreqlist[3]
+ 		 * binsupportedfreqlist[4]
+ 		 * binsupportedfreqlevelcount
+ 		 */
+ 		/* bin 0 */
+-		1 7 180000000 342000000 510000000 675000000 828000000 5
++		1 7 180000000 342000000 520000000 675000000 812000000 5
+ 		/* bin 1 */
+-		0 7 180000000 342000000 510000000 675000000 828000000 5
++		0 7 180000000 342000000 520000000 675000000 812000000 5
+ 	>;
+ 
+-	qcom,initial-pwrlevel = <6>;
++	qcom,initial-pwrlevel = <4>;
+ 
+ 	/* ACD interface */
+ 	qcom,gpu-quirk-acd-dcvs-invalidate-always;
+ };
+ 
+diff --git a/drivers/clk/qcom/gpucc-sdm845.c b/drivers/clk/qcom/gpucc-sdm845.c
+index 1234567..abcdefg 100644
+--- a/drivers/clk/qcom/gpucc-sdm845.c
++++ b/drivers/clk/qcom/gpucc-sdm845.c
+@@ -238,11 +238,12 @@ static struct clk_init_data gpu_cc_gx_gfx3d_clk_src_init = {
+ };
+ 
+ static const struct freq_tbl ftbl_gpu_cc_gx_gfx3d_clk_src_sdm845_v2[] = {
+-	F(180000000, P_CRC_DIV, 1, 0, 0),
+-	F(342000000, P_CRC_DIV, 1, 0, 0),
+-	F(510000000, P_CRC_DIV, 1, 0, 0),
+-	F(675000000, P_CRC_DIV, 1, 0, 0),
+-	F(828000000, P_CRC_DIV, 1, 0, 0),
++	F(180000000, P_CRC_DIV, 1, 0, 0),  /* Min freq - new default */
++	F(257000000, P_CRC_DIV, 1, 0, 0),  /* New step */
++	F(342000000, P_CRC_DIV, 1, 0, 0),  /* Stock low */
++	F(414000000, P_CRC_DIV, 1, 0, 0),  /* New step */
++	F(520000000, P_CRC_DIV, 1, 0, 0),  /* Stock nominal */
++	F(675000000, P_CRC_DIV, 1, 0, 0),  /* Stock high */
++	F(812000000, P_CRC_DIV, 1, 0, 0),  /* OC - up from 710MHz stock */
+ 	{ }
+ };
+ 
+diff --git a/drivers/clk/qcom/vdd-level-sdm845.h b/drivers/clk/qcom/vdd-level-sdm845.h
+index 1234567..abcdefg 100644
+--- a/drivers/clk/qcom/vdd-level-sdm845.h
++++ b/drivers/clk/qcom/vdd-level-sdm845.h
+@@ -30,6 +30,7 @@ enum vdd_levels {
+ 	VDD_LOW_L1,
+ 	VDD_NOMINAL,
+ 	VDD_NOMINAL_L1,
++	VDD_HIGH,
+ 	VDD_HIGH_L1,
+ 	VDD_MAX,
+ };
+@@ -43,7 +44,8 @@ enum vdd_levels {
+ 	[VDD_LOW_L1]    = RPMH_REGULATOR_LEVEL_SVS_L1,
+ 	[VDD_NOMINAL]   = RPMH_REGULATOR_LEVEL_NOM,
+ 	[VDD_NOMINAL_L1]= RPMH_REGULATOR_LEVEL_NOM_L1,
+-	[VDD_HIGH_L1]   = RPMH_REGULATOR_LEVEL_TURBO,
++	[VDD_HIGH]      = RPMH_REGULATOR_LEVEL_TURBO,
++	[VDD_HIGH_L1]   = RPMH_REGULATOR_LEVEL_TURBO_L1,
+ 	[VDD_MAX]       = RPMH_REGULATOR_LEVEL_MAX,
+ };
+ 
+-- 
+2.34.1

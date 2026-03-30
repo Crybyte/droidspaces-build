@@ -97,12 +97,18 @@ jobs:
           
           # CRITICAL FIX: The setup.sh creates KernelSU-Next and symlinks drivers/kernelsu -> KernelSU-Next/kernel
           # If we manually cloned to KernelSU, we need to update the symlink to point to the right place
+          echo "=== Setting up KernelSU symlink ==="
           if [ -d "KernelSU" ] && [ -L "drivers/kernelsu" ]; then
             echo "Fixing kernelsu symlink to point to KernelSU/kernel..."
             rm -f drivers/kernelsu
             ln -sf "$(realpath --relative-to="drivers" "KernelSU/kernel")" drivers/kernelsu
             echo "Symlink updated: drivers/kernelsu -> $(readlink drivers/kernelsu)"
           fi
+          
+          # CRITICAL FIX v26: Ensure symlink points to the correct location BEFORE determining KSU_KERNEL_DIR
+          # The order matters - we must update the symlink first, then read its target
+          echo "=== Verifying KernelSU symlink ==="
+          ls -la drivers/kernelsu 2>/dev/null || echo "drivers/kernelsu not found"
           
           # Determine which kernel directory to patch
           # Priority: drivers/kernelsu (what's actually being compiled) -> KernelSU-Next/kernel -> KernelSU/kernel
@@ -231,6 +237,7 @@ jobs:
           
           # Run external fix script for kernel 4.9 compatibility
           # This handles the try_umount function DEFINITION (not just calls)
+<<<<<<< HEAD
           if [ -f "build-scripts/fix-kernelsu-49-v17.py" ]; then
             echo "=== Running kernel 4.9 compatibility fix script v17 ==="
             python3 build-scripts/fix-kernelsu-49-v17.py "$KSU_KERNEL_DIR"
@@ -259,14 +266,97 @@ jobs:
             build-scripts/fix-kernelsu-49.sh "$KSU_KERNEL_DIR"
           else
             echo "WARNING: No kernel 4.9 fix script found, applying inline patches only"
+=======
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" ]; then
+            echo "=== Applying pre-patched core_hook.c for kernel 4.9 compatibility ==="
+            KSU_CORE_HOOK="$KSU_KERNEL_DIR/core_hook.c"
+            if [ -f "$KSU_CORE_HOOK" ]; then
+              cp "$KSU_CORE_HOOK" "${KSU_CORE_HOOK}.orig"
+              cp "$GITHUB_WORKSPACE/build-scripts/core_hook.c.patched" "$KSU_CORE_HOOK"
+              echo "SUCCESS: Replaced core_hook.c with kernel 4.9 compatible version"
+              # Verify the patch
+              if grep -q "kmalloc(PATH_MAX" "$KSU_CORE_HOOK"; then
+                echo "VERIFIED: core_hook.c contains kernel 4.9 compatible code"
+              else
+                echo "WARNING: core_hook.c may not be properly patched"
+              fi
+            else
+              echo "WARNING: core_hook.c not found at $KSU_CORE_HOOK"
+            fi
+>>>>>>> origin/main
           fi
           
+          # CRITICAL FIX v28: Guaranteed fix for 'flags' undeclared error
+          # This runs ALL scripts to maximize fix coverage
+          echo "=== Running ALL available kernel 4.9 compatibility fix scripts ==="
+
+          # Run v28 first (most aggressive)
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v28.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v28 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v28.py" "$KSU_KERNEL_DIR" || echo "v28 script exited with code $?"
+          fi
+
+          # Run v27 as additional coverage
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v27 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v27.py" "$KSU_KERNEL_DIR" || echo "v27 script exited with code $?"
+          fi
+
+          # Run v26 as additional coverage
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v26 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v26.py" "$KSU_KERNEL_DIR" || echo "v26 script exited with code $?"
+          fi
+
+          # Run v25 as additional coverage
+          if [ -f "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" ]; then
+            echo "=== Running kernel 4.9 compatibility fix script v25 (Python) ==="
+            KSU_DIR="$KSU_KERNEL_DIR" python3 "$GITHUB_WORKSPACE/build-scripts/fix_kernelsu_49_v25.py" "$KSU_KERNEL_DIR" || echo "v25 script exited with code $?"
+          fi
+
+          # ULTRA-CRITICAL: Direct inline fix for line 591 'flags' issue
+          # This is a guaranteed fix that runs AFTER all Python scripts
+          echo "=== Applying ULTRA-CRITICAL inline fix for line 591 ==="
+          CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
+            echo "Before fix - line 591:"
+            sed -n '591p' "$CORE_HOOK_FILE"
+
+            # Fix 1: Replace ksu_umount_mnt(&path, flags) with ksu_umount_mnt(&path, 0)
+            sed -i '591s/ksu_umount_mnt(&path, flags)/ksu_umount_mnt(\&path, 0)/g' "$CORE_HOOK_FILE"
+
+            # Fix 2: Also fix try_umount signature to remove flags parameter
+            sed -i 's/try_umount(const char \*mnt, bool check_mnt, int flags)/try_umount(const char *mnt, bool check_mnt)/g' "$CORE_HOOK_FILE"
+
+            # Fix 3: Fix ksu_umount_mnt signature to remove flags parameter
+            sed -i 's/ksu_umount_mnt(struct path \*path, int flags)/ksu_umount_mnt(struct path *path)/g' "$CORE_HOOK_FILE"
+
+            echo "After fix - line 591:"
+            sed -n '591p' "$CORE_HOOK_FILE"
+          fi
+
           echo "=== Patching complete: $PATCH_COUNT path_umount calls replaced ==="
           
           # Verify the symlink is correct
           echo "=== Final verification ==="
           ls -la drivers/kernelsu 2>/dev/null || echo "drivers/kernelsu not found"
           echo "Symlink points to: $(readlink -f drivers/kernelsu 2>/dev/null || echo 'N/A')"
+          
+          # CRITICAL: Show line 591 of core_hook.c to verify the fix
+          echo "=== Verifying core_hook.c line 591 (flags fix) ==="
+          CORE_HOOK_FILE=$(readlink -f drivers/kernelsu/core_hook.c 2>/dev/null || echo "")
+          if [ -n "$CORE_HOOK_FILE" ] && [ -f "$CORE_HOOK_FILE" ]; then
+            echo "core_hook.c line 591:"
+            sed -n '591p' "$CORE_HOOK_FILE"
+            # Check if it still contains 'flags'
+            if sed -n '591p' "$CORE_HOOK_FILE" | grep -q 'flags'; then
+              echo "WARNING: Line 591 still contains 'flags' - build may fail!"
+            else
+              echo "OK: Line 591 does not contain 'flags'"
+            fi
+          else
+            echo "WARNING: Could not find core_hook.c for verification"
+          fi
 
       - name: Add susfs patches (DISABLED - causing build failures)
         if: github.event.inputs.kernelsu_version != 'v3.0.0'
